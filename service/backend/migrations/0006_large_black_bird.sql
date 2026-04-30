@@ -1,0 +1,1 @@
+DROP INDEX `businesses_organization_id_unique`;

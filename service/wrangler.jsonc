@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ve-track",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./workers/app.ts",
+  "keep_vars": true,
+  "vars": {
+    "VE_APP": "ve-track",
+    "APP_URL": "https://track.viewengine.ai"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ve-track-db",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "./backend/migrations"
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "USAGE_LOGS",
+      "dataset": "ve_usage_logs"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 * * * *"]
+  }
+}

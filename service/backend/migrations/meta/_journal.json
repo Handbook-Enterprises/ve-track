@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1770370569885,
+      "tag": "0000_tiresome_sunspot",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1770376356567,
+      "tag": "0001_brave_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1770474220452,
+      "tag": "0002_fuzzy_rachel_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1770503620230,
+      "tag": "0003_luxuriant_ezekiel_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1770548394409,
+      "tag": "0004_aspiring_vertigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1770731029908,
+      "tag": "0005_nebulous_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1770822742427,
+      "tag": "0006_large_black_bird",
+      "breakpoints": true
+    }
+  ]
+}
