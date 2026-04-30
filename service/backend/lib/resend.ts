@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import {
+import type  {
   ResendConfig,
   SendEmailOptions,
   SendEmailResult,

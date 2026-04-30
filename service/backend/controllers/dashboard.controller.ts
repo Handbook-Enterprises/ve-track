@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import DashboardService from "../services/dashboard.service";
 import { manageAsyncOps } from "../utils";
@@ -50,7 +50,7 @@ class DashboardController {
 
   static async revokeKeyController(c: DashContext) {
     const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
+    const id = c.req.param("id")!;
     const [error, data] = await manageAsyncOps(
       DashboardService.revokeApiKey(db, id),
     );

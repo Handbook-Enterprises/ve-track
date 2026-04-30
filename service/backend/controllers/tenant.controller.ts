@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import TenantService from "../services/tenant.service";
 import { manageAsyncOps } from "../utils";
