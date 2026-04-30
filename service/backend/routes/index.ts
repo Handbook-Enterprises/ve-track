@@ -1,8 +1,10 @@
 import adminRouter from "./admin.routes";
+import dashboardRouter from "./dashboard.routes";
 import v1Router from "./v1.routes";
 
 const routes = (app: any) => {
   app.route("/api/admin", adminRouter);
+  app.route("/api/dashboard", dashboardRouter);
   app.route("/api/v1", v1Router);
 };
 

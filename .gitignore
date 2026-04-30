@@ -12,4 +12,5 @@
 .wrangler
 .dev.vars*
 worker-configuration.d.ts
+references
 

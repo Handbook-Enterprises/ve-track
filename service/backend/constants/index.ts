@@ -1,4 +1,4 @@
-import { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export const HTTP_STATUS_CODES = {
   SUCCESS: 200 as ContentfulStatusCode,

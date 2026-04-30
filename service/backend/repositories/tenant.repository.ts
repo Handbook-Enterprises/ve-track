@@ -22,6 +22,22 @@ class TenantRepository {
     return row;
   }
 
+  static async fetchByClerkOrgId(db: DrizzleD1Database, clerkOrgId: string) {
+    const [row] = await db
+      .select()
+      .from(Tenant)
+      .where(eq(Tenant.clerk_org_id, clerkOrgId));
+    return row;
+  }
+
+  static async fetchByClerkUserId(db: DrizzleD1Database, clerkUserId: string) {
+    const [row] = await db
+      .select()
+      .from(Tenant)
+      .where(eq(Tenant.clerk_user_id, clerkUserId));
+    return row;
+  }
+
   static async fetchAll(db: DrizzleD1Database) {
     return db
       .select({

@@ -2,12 +2,12 @@ import { sql } from "drizzle-orm";
 import { text } from "drizzle-orm/sqlite-core";
 
 export const timestamps = {
-  updated_at: text("timestamp")
+  updated_at: text("updated_at")
     .notNull()
     .default(sql`(current_timestamp)`),
-  created_at: text("timestamp")
-    .default(sql`(current_timestamp)`)
-    .notNull(),
+  created_at: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
 };
 
 export const manageAsyncOps = async (fn: Promise<any>) => {
