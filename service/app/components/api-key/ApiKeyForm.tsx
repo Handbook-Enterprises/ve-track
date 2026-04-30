@@ -59,7 +59,7 @@ export default function ApiKeyForm({ onSubmit, loading }: Props) {
                 New API key label
               </FormLabel>
               <FormControl>
-                <Input placeholder="ve-fanout production" {...field} />
+                <Input placeholder="eg. ve-fanout production" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
