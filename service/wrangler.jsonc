@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "ve-track-db",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_id": "682a8556-98ed-4b21-91bb-2699382b6779",
       "migrations_dir": "./backend/migrations"
     }
   ],

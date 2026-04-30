@@ -24,6 +24,9 @@
   },
   "homepage": "https://track.viewengine.ai",
   "private": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "peerDependencies": {
     "@clerk/backend": ">=2.0.0"
   },
