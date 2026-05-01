@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { PROVIDERS } from "./providers";
 import { captureOriginalFetch, flushEvents } from "./ingest";
-import type { RequestScope, VeTrackEvent } from "./types";
+import type { RequestScope, VeTrackEvent, VeTrackUser } from "./types";
 
 const requestContext = new AsyncLocalStorage<RequestScope>();
 
@@ -81,4 +81,22 @@ export function runScope<T>(
       scope.ctx.waitUntil(flushEvents(scope));
     }
   });
+}
+
+export function withUser<T>(
+  user: VeTrackUser,
+  handler: () => Promise<T> | T,
+): Promise<T> {
+  const scope = requestContext.getStore();
+  if (!scope) return Promise.resolve(handler());
+  const childScope: RequestScope = {
+    ...scope,
+    userId: user.userId,
+    orgId: user.orgId,
+  };
+  return Promise.resolve(requestContext.run(childScope, handler));
+}
+
+export function getCurrentScope(): RequestScope | undefined {
+  return requestContext.getStore();
 }

@@ -21,7 +21,7 @@
     "@fontsource-variable/space-grotesk": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-table": "^8.21.3",
-    "@viewengine/track": "file:..",
+    "@viewengine/track": "link:..",
     "axios": "^1.13.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

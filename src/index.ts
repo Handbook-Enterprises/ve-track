@@ -1,6 +1,11 @@
 export { trackedHandler } from "./handler";
 export { clerkUserResolver } from "./clerk";
-export { installFetchHook, runScope } from "./hook";
+export {
+  installFetchHook,
+  runScope,
+  withUser,
+  getCurrentScope,
+} from "./hook";
 export { PROVIDERS } from "./providers";
 export type {
   TrackedHandlerConfig,

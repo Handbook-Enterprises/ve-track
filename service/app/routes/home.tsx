@@ -4,7 +4,7 @@ import type { Route } from "./+types/home";
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "ve-track · cost attribution for AI apps" },
+    { title: "ViewEngine Track · cost attribution for AI apps" },
     {
       name: "description",
       content:
