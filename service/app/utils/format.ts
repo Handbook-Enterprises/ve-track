@@ -1,9 +1,14 @@
 export function formatMoney(n: number | null | undefined): string {
   const num = Number(n ?? 0);
   if (!Number.isFinite(num)) return "$0.00";
+  if (num === 0) return "$0.00";
+  const abs = Math.abs(num);
+  let max = 2;
+  if (abs < 0.01) max = 6;
+  else if (abs < 1) max = 4;
   return `$${num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: max,
   })}`;
 }
 

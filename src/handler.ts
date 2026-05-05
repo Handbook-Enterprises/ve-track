@@ -1,9 +1,5 @@
 import { installFetchHook, runScope } from "./hook";
-import type {
-  RequestScope,
-  TrackedHandlerConfig,
-  VeTrackUser,
-} from "./types";
+import type { RequestScope, TrackedHandlerConfig, VeTrackUser } from "./types";
 
 const DEFAULT_BASE_URL = "https://track.viewengine.ai";
 const EMPTY_USER: VeTrackUser = { userId: null, orgId: null };
@@ -25,18 +21,22 @@ const buildScope = <E>(
   apiKeySource: ((env: E) => string | undefined) | undefined,
   baseUrlOverride: string | undefined,
   user: VeTrackUser,
-): RequestScope => ({
-  ctx,
-  app,
-  apiKey: resolveString(apiKeySource, env, "VE_TRACK_KEY"),
-  baseUrl:
+): RequestScope => {
+  const apiKey = resolveString(apiKeySource, env, "VE_TRACK_KEY");
+  const baseUrl =
     baseUrlOverride ??
     resolveString(undefined, env, "VE_TRACK_BASE_URL") ??
-    DEFAULT_BASE_URL,
-  userId: user.userId,
-  orgId: user.orgId,
-  buffer: [],
-});
+    DEFAULT_BASE_URL;
+  return {
+    ctx,
+    app,
+    apiKey,
+    baseUrl,
+    userId: user.userId,
+    orgId: user.orgId,
+    buffer: [],
+  };
+};
 
 export function trackedHandler<E>(
   config: TrackedHandlerConfig<E>,
