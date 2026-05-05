@@ -31,6 +31,15 @@ export interface UsageGroup {
   prompt_tokens: number;
   completion_tokens: number;
   requests: number;
+  name?: string | null;
+  secondary?: string | null;
+  imageUrl?: string | null;
+}
+
+export interface UsageDelta {
+  previousCost: number;
+  pctChange: number | null;
+  direction: "up" | "down" | "flat";
 }
 
 export interface UsageTotals {
@@ -39,4 +48,5 @@ export interface UsageTotals {
   completion_tokens: number;
   requests: number;
   fromDays: number;
+  delta?: UsageDelta;
 }

@@ -36,8 +36,10 @@ export function useUsage(initial?: UsageQueryFilters) {
     setError(null);
     try {
       const data = await UsageService.getOverview(authFetch, filters);
+     
       setOverview(data.overview);
     } catch (err) {
+      console.error("[ve-track][useUsage] overview fetch failed", err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);

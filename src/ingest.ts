@@ -7,13 +7,19 @@ export function captureOriginalFetch(): void {
 }
 
 export async function flushEvents(scope: RequestScope): Promise<void> {
-  if (!scope.apiKey || scope.buffer.length === 0) return;
+  if (!scope.apiKey) {
+    return;
+  }
+  if (scope.buffer.length === 0) {
+    return;
+  }
 
   const events: VeTrackEvent[] = scope.buffer.splice(0);
   const sender = originalFetch ?? globalThis.fetch;
+  const url = `${scope.baseUrl}/api/v1/events`;
 
   try {
-    await sender(`${scope.baseUrl}/api/v1/events`, {
+    const res = await sender(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -21,7 +27,8 @@ export async function flushEvents(scope: RequestScope): Promise<void> {
       },
       body: JSON.stringify({ app: scope.app, events }),
     });
+    await res.text().catch(() => "<unreadable>");
   } catch (err) {
-    console.error("[ve-track] flush failed:", err);
+    console.error("[ve-track][ingest] flush failed:", err);
   }
 }

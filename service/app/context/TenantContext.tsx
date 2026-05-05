@@ -53,6 +53,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const data = await handleApiResponse<MeResponse>(res);
       setTenant(data.tenant);
     } catch (err) {
+      console.error("[ve-track][TenantContext] /dashboard/me failed", err);
       setError(err instanceof Error ? err.message : "Failed to load tenant");
       setTenant(null);
     } finally {

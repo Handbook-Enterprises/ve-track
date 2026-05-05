@@ -35,7 +35,8 @@ const baseFilters = (
 const validateEvent = (e: UsageEventInput) => {
   if (!e || typeof e !== "object") return false;
   if (typeof e.id !== "string" || !e.id) return false;
-  if (typeof e.timestamp !== "number" || !Number.isFinite(e.timestamp)) return false;
+  if (typeof e.timestamp !== "number" || !Number.isFinite(e.timestamp))
+    return false;
   if (typeof e.provider !== "string" || !e.provider) return false;
   return true;
 };
@@ -155,11 +156,27 @@ class UsageEventService {
     query: UsageQuery,
   ) {
     const fromDays = parseFromDays(query.fromDays);
-    const totals = await UsageEventRepository.totals(
-      db,
-      baseFilters(tenantId, query, fromDays),
-    );
-    const result: UsageTotals = { ...totals, fromDays };
+    const filters = baseFilters(tenantId, query, fromDays);
+    const [totals, prev] = await Promise.all([
+      UsageEventRepository.totals(db, filters),
+      UsageEventRepository.previousTotals(db, filters, fromDays),
+    ]);
+    const previousCost = Number(prev.cost_usd ?? 0);
+    const currentCost = Number(totals.cost_usd ?? 0);
+    let pctChange: number | null = null;
+    let direction: "up" | "down" | "flat" = "flat";
+    if (previousCost > 0) {
+      pctChange = ((currentCost - previousCost) / previousCost) * 100;
+      direction = pctChange > 0.5 ? "up" : pctChange < -0.5 ? "down" : "flat";
+    } else if (currentCost > 0) {
+      pctChange = null;
+      direction = "up";
+    }
+    const result: UsageTotals = {
+      ...totals,
+      fromDays,
+      delta: { previousCost, pctChange, direction },
+    };
     return {
       success: true,
       message: UsageEventMessages.FETCH_SUCCESS,

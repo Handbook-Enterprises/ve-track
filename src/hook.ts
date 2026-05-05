@@ -14,10 +14,7 @@ export function installFetchHook(): void {
 
   const originalFetch = globalThis.fetch.bind(globalThis);
 
-  globalThis.fetch = (async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === "string"
         ? input
@@ -29,7 +26,9 @@ export function installFetchHook(): void {
     if (!provider) return originalFetch(input, init);
 
     const scope = requestContext.getStore();
-    if (!scope) return originalFetch(input, init);
+    if (!scope) {
+      return originalFetch(input, init);
+    }
 
     const mutableInit: RequestInit = init ?? {};
     provider.enhance?.(mutableInit, scope.app, {

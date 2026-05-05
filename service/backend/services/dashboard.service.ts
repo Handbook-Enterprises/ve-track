@@ -2,10 +2,13 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService from "./usage-event.service";
+import { resolveIdentities } from "../lib/clerk-identities";
+import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
 import type {
-  ApiKeyCreateBody,
-} from "../interfaces/api-key.interface";
-import type { UsageQuery } from "../interfaces/usage-event.interface";
+  UsageGroup,
+  UsageQuery,
+} from "../interfaces/usage-event.interface";
+import type { Env } from "../types";
 
 class DashboardService {
   static async getMe(db: DrizzleD1Database, tenantId: string) {
@@ -34,6 +37,7 @@ class DashboardService {
 
   static async getOverview(
     db: DrizzleD1Database,
+    env: Env,
     tenantId: string,
     query: UsageQuery,
   ) {
@@ -47,14 +51,43 @@ class DashboardService {
         UsageEventService.getTotals(db, tenantId, query),
       ]);
 
+    const userIds = byUser.groups
+      .map((g) => g.key)
+      .filter((id): id is string => !!id);
+    const orgIds = byOrg.groups
+      .map((g) => g.key)
+      .filter((id): id is string => !!id);
+    const { users, orgs } = await resolveIdentities(env, userIds, orgIds);
+
+    const enrich = (
+      groups: UsageGroup[],
+      lookup: Map<
+        string,
+        { name: string; secondary: string | null; imageUrl?: string | null }
+      >,
+    ): UsageGroup[] =>
+      groups.map((g) => {
+        const id = g.key;
+        const hit = id ? lookup.get(id) : null;
+        return {
+          ...g,
+          name: hit?.name ?? null,
+          secondary: hit?.secondary ?? null,
+          imageUrl: hit?.imageUrl ?? null,
+        };
+      });
+
+    const enrichedByUser = enrich(byUser.groups, users);
+    const enrichedByOrg = enrich(byOrg.groups, orgs);
+
     return {
       success: true,
       overview: {
         fromDays: totals.totals.fromDays,
         totals: totals.totals,
         byApp: byApp.groups,
-        byOrg: byOrg.groups,
-        byUser: byUser.groups,
+        byOrg: enrichedByOrg,
+        byUser: enrichedByUser,
         byProvider: byProvider.groups,
         byModel: byModel.groups,
       },
