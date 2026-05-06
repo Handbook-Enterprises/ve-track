@@ -92,6 +92,95 @@ class UsageEventRepository {
     return Date.now() - fromDays * dayMs;
   }
 
+  static async crossTenantTotals(
+    db: DrizzleD1Database,
+    fromTs: number,
+    app?: string,
+  ) {
+    const conditions = [gte(UsageEvent.timestamp, fromTs)];
+    if (app) conditions.push(eq(UsageEvent.app, app));
+    const [row] = await db
+      .select({
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        prompt_tokens: sql<number>`COALESCE(SUM(${UsageEvent.prompt_tokens}), 0)`,
+        completion_tokens: sql<number>`COALESCE(SUM(${UsageEvent.completion_tokens}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(and(...conditions));
+    return (
+      row ?? { cost_usd: 0, prompt_tokens: 0, completion_tokens: 0, requests: 0 }
+    );
+  }
+
+  static async crossTenantGroupBy(
+    db: DrizzleD1Database,
+    column: keyof typeof UsageEvent.$inferSelect,
+    fromTs: number,
+    app?: string,
+  ) {
+    const col = (UsageEvent as any)[column];
+    const conditions = [gte(UsageEvent.timestamp, fromTs)];
+    if (app) conditions.push(eq(UsageEvent.app, app));
+    return db
+      .select({
+        key: col,
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        prompt_tokens: sql<number>`COALESCE(SUM(${UsageEvent.prompt_tokens}), 0)`,
+        completion_tokens: sql<number>`COALESCE(SUM(${UsageEvent.completion_tokens}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(and(...conditions))
+      .groupBy(col)
+      .orderBy(desc(sql`SUM(${UsageEvent.cost_usd})`));
+  }
+
+  static async crossTenantTotalsBetween(
+    db: DrizzleD1Database,
+    fromTs: number,
+    toTs: number,
+    app?: string,
+  ) {
+    const conditions = [
+      gte(UsageEvent.timestamp, fromTs),
+      sql`${UsageEvent.timestamp} < ${toTs}`,
+    ];
+    if (app) conditions.push(eq(UsageEvent.app, app));
+    const [row] = await db
+      .select({
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(and(...conditions));
+    return row ?? { cost_usd: 0, requests: 0 };
+  }
+
+  static async crossTenantGroupByBetween(
+    db: DrizzleD1Database,
+    column: keyof typeof UsageEvent.$inferSelect,
+    fromTs: number,
+    toTs: number,
+    app?: string,
+  ) {
+    const col = (UsageEvent as any)[column];
+    const conditions = [
+      gte(UsageEvent.timestamp, fromTs),
+      sql`${UsageEvent.timestamp} < ${toTs}`,
+    ];
+    if (app) conditions.push(eq(UsageEvent.app, app));
+    return db
+      .select({
+        key: col,
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(and(...conditions))
+      .groupBy(col);
+  }
+
   static async previousTotals(
     db: DrizzleD1Database,
     filters: BaseFilters,

@@ -43,6 +43,7 @@ export interface UsageQueryFilters {
   provider?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
+  action?: string;
 }
 
 export interface UsageOverviewResponse {

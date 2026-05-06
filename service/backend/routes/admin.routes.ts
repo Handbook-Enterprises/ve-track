@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import TenantController from "../controllers/tenant.controller";
 import ApiKeyController from "../controllers/api-key.controller";
+import AdminUsageController from "../controllers/admin-usage.controller";
 import { adminApiKeyMiddleware } from "../middleware/api-key";
 import type { Env } from "../types";
 
@@ -17,5 +18,9 @@ adminRouter.delete("/tenants/:id", TenantController.deleteController);
 adminRouter.post("/tenants/:tenantId/keys", ApiKeyController.createController);
 adminRouter.get("/tenants/:tenantId/keys", ApiKeyController.listController);
 adminRouter.delete("/keys/:id", ApiKeyController.revokeController);
+
+adminRouter.get("/usage/totals", AdminUsageController.totalsController);
+adminRouter.get("/usage/by-app", AdminUsageController.byAppController);
+adminRouter.get("/usage/by-action", AdminUsageController.byActionController);
 
 export default adminRouter;

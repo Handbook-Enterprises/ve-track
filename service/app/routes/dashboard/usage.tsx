@@ -1,78 +1,73 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Building2,
-  Cpu,
-  DollarSign,
-  Layers,
-  Plug,
-  Receipt,
   RefreshCw,
   Sparkles,
-  Target,
-  User2,
+  X,
 } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 import StatCard from "~/components/common/stat-card";
-import CostTable from "~/components/common/cost-table";
-import IdentityCell from "~/components/common/identity-cell";
-import DeltaBadge from "~/components/common/delta-badge";
+import NarrativeSummary from "~/components/common/narrative-summary";
+import ActionTable from "~/components/common/action-table";
+import ActionDetailSheet from "~/components/common/action-detail-sheet";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
-import type {
-  UsageDimension,
-  UsageGroup,
-  UsageQueryFilters,
-} from "~/types/usage.types";
+import type { UsageGroup, UsageQueryFilters } from "~/types/usage.types";
 
 type Range = 7 | 30 | 90;
 
-const TABS: {
-  key: UsageDimension;
-  marker: string;
-  label: string;
-  icon: typeof Layers;
-  emptyKey: string;
-}[] = [
-  { key: "action", marker: "01", label: "By Action", icon: Target, emptyKey: "Untagged" },
-  { key: "app", marker: "02", label: "By App", icon: Layers, emptyKey: "Unattributed" },
-  { key: "org", marker: "03", label: "By Organization", icon: Building2, emptyKey: "Personal / no org" },
-  { key: "user", marker: "04", label: "By Person", icon: User2, emptyKey: "Anonymous" },
-  { key: "provider", marker: "05", label: "By Provider", icon: Plug, emptyKey: "Unknown" },
-  { key: "model", marker: "06", label: "By Model", icon: Cpu, emptyKey: "—" },
-];
+const FILTER_LABELS: Record<keyof UsageQueryFilters, string> = {
+  fromDays: "range",
+  app: "app",
+  provider: "provider",
+  clerk_org_id: "org",
+  clerk_user_id: "user",
+  action: "action",
+};
 
 export default function UsagePage() {
   const [range, setRange] = useState<Range>(7);
-  const [tab, setTab] = useState<UsageDimension>("action");
+  const [filters, setFilters] = useState<UsageQueryFilters>({});
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const filters: UsageQueryFilters = useMemo(() => ({ fromDays: range }), [range]);
-  const { overview, loading, error, canaryRunning, refetch, runCanary } =
-    useUsage(filters);
-
-  const groupsByTab = useMemo(
-    () => ({
-      action: overview.byAction,
-      app: overview.byApp,
-      org: overview.byOrg,
-      user: overview.byUser,
-      provider: overview.byProvider,
-      model: overview.byModel,
-    }),
-    [overview],
+  const fullFilters: UsageQueryFilters = useMemo(
+    () => ({ ...filters, fromDays: range }),
+    [filters, range],
   );
-  const activeGroups: UsageGroup[] = groupsByTab[tab];
-  const activeTab = TABS.find((t) => t.key === tab)!;
-  const totals = overview.totals;
-  const top = activeGroups[0];
 
-  if (loading) {
+  const { overview, loading, error, canaryRunning, refetch, runCanary, setFilters: setHookFilters } =
+    useUsage(fullFilters);
+
+  useEffect(() => {
+    setHookFilters(fullFilters);
+  }, [fullFilters, setHookFilters]);
+
+  const handleSelectAction = (action: UsageGroup) => {
+    setSelectedAction(action.key);
+    setSheetOpen(true);
+  };
+
+  const removeFilter = (key: keyof UsageQueryFilters) => {
+    setFilters((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const activeFilterEntries = (Object.entries(filters) as [
+    keyof UsageQueryFilters,
+    string | number | undefined,
+  ][]).filter(([, v]) => v !== undefined && v !== "");
+
+  if (loading && !overview.totals.requests) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <LoadingElement size={28} />
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             Pulling ledger…
           </p>
         </div>
@@ -97,117 +92,23 @@ export default function UsagePage() {
     );
   }
 
-  const renderTopCallout = () => {
-    if (!top) return null;
-    if (tab === "action") {
-      const avg = top.requests > 0 ? top.cost_usd / top.requests : 0;
-      return (
-        <section className="border border-primary/40 bg-primary/[0.04] p-5">
-          <div className="flex items-end justify-between gap-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-              Most expensive action · {totals.fromDays}d
-            </p>
-            <p className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
-              credit pricing input
-            </p>
-          </div>
-          <p className="mt-2 text-[1.6rem] font-semibold leading-tight">
-            {top.key || activeTab.emptyKey}
-          </p>
-          <div className="mt-4 grid gap-px bg-border sm:grid-cols-3">
-            <div className="bg-card p-4">
-              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
-                avg / run
-              </p>
-              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
-                {formatMoney(avg)}
-              </p>
-            </div>
-            <div className="bg-card p-4">
-              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
-                runs
-              </p>
-              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
-                {top.requests.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-card p-4">
-              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
-                total spend
-              </p>
-              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
-                {formatMoney(top.cost_usd)}
-              </p>
-            </div>
-          </div>
-        </section>
-      );
-    }
-    if (tab === "user" || tab === "org") {
-      return (
-        <section className="border border-primary/30 bg-primary/[0.04] p-5">
-          <div className="flex items-end justify-between gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-4">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-                Top {tab === "user" ? "spender" : "organization"} ·{" "}
-                {totals.fromDays}d
-              </span>
-            </div>
-            <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              {totals.cost_usd > 0
-                ? `${Math.round((top.cost_usd / totals.cost_usd) * 100)}% of spend`
-                : ""}
-            </p>
-          </div>
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-            <IdentityCell
-              name={top.name}
-              secondary={top.secondary}
-              fallbackId={top.key}
-              fallbackLabel={activeTab.emptyKey}
-              imageUrl={top.imageUrl ?? null}
-              accent
-            />
-            <p className="font-mono text-[1.6rem] font-medium tabular-nums">
-              {formatMoney(top.cost_usd)}
-            </p>
-          </div>
-        </section>
-      );
-    }
-    return (
-      <section className="border border-primary/30 bg-primary/[0.04] p-5">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-              Most expensive {tab} · {totals.fromDays}d
-            </p>
-            <p className="mt-2 text-[1.4rem] font-semibold leading-tight">
-              {top.key || activeTab.emptyKey}
-            </p>
-          </div>
-          <p className="font-mono text-[1.6rem] font-medium tabular-nums">
-            {formatMoney(top.cost_usd)}
-          </p>
-        </div>
-      </section>
-    );
-  };
+  const totals = overview.totals;
+  const costPerCall = totals.requests > 0 ? totals.cost_usd / totals.requests : 0;
 
   return (
     <div className="space-y-10 pb-16">
       <header className="border-b border-foreground/15 pb-7">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-              ve-track ledger · attribution
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              ve-track · usage
             </p>
-            <h1 className="mt-3 text-[clamp(2.1rem,4.4vw,3rem)] font-bold leading-[1] tracking-tight">
+            <h1 className="mt-3 text-[clamp(2.4rem,4.8vw,3.2rem)] font-extrabold leading-[1.05] tracking-tight">
               Where the spend went.
             </h1>
-            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
-              Live aggregates from every event your apps shipped. Switch the
-              dimension to see who, where, and how.
+            <p className="mt-2 text-[13.5px] text-muted-foreground">
+              Click any action below to see which apps, people, orgs, and
+              providers ran it.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -217,7 +118,7 @@ export default function UsagePage() {
                   key={r}
                   onClick={() => setRange(r)}
                   className={cn(
-                    "px-3 py-1 font-mono text-[11px] tabular-nums transition-colors",
+                    "px-3 py-1 text-[11px] font-semibold tabular-nums transition-colors",
                     range === r
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground",
@@ -251,12 +152,46 @@ export default function UsagePage() {
         </div>
       </header>
 
+      <NarrativeSummary overview={overview} />
+
+      {activeFilterEntries.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Filtering:
+          </span>
+          {activeFilterEntries.map(([key, value]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => removeFilter(key)}
+              className="group inline-flex items-center gap-1.5 border bg-card px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:border-destructive/40 hover:text-destructive"
+            >
+              <span className="text-muted-foreground group-hover:text-destructive">
+                {FILTER_LABELS[key] ?? key}:
+              </span>
+              <span className="tabular-nums">
+                {String(value).length > 28
+                  ? `${String(value).slice(0, 12)}…${String(value).slice(-6)}`
+                  : value}
+              </span>
+              <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setFilters({})}
+            className="ml-1 text-[11px] uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            clear all
+          </button>
+        </div>
+      ) : null}
+
       <section className="grid gap-px bg-border md:grid-cols-3">
         <StatCard
           marker="I"
           title={`Spend · last ${totals.fromDays}d`}
           value={formatMoney(totals.cost_usd)}
-          icon={DollarSign}
           delta={totals.delta}
           deltaInverted
           description={
@@ -270,88 +205,43 @@ export default function UsagePage() {
           marker="II"
           title="API calls"
           value={formatNumber(totals.requests)}
-          icon={Sparkles}
           description="provider requests captured"
         />
         <StatCard
           marker="III"
           title="Cost / call"
-          value={
-            totals.requests > 0
-              ? formatMoney(totals.cost_usd / totals.requests)
-              : "$0.00"
-          }
-          icon={Receipt}
+          value={formatMoney(costPerCall)}
           description="blended across providers"
         />
       </section>
 
-      {renderTopCallout()}
-
-      <section className="space-y-4">
-        <div className="flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            ── /04 · breakdown
+      <section>
+        <div className="mb-4 flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              ── /01 · Action ledger
+            </p>
+            <h2 className="mt-1 text-[18px] font-bold tracking-tight">
+              Every action, what it costs, who ran it
+            </h2>
+          </div>
+          <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+            click a row for the full story
           </p>
-          {totals.delta ? (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                vs prev {totals.fromDays}d
-              </span>
-              <DeltaBadge delta={totals.delta} inverted />
-            </div>
-          ) : null}
         </div>
-
-        <div className="grid grid-cols-2 gap-px bg-border md:grid-cols-3 lg:grid-cols-6">
-          {TABS.map((t) => {
-            const groups = groupsByTab[t.key];
-            const cost = groups.reduce((sum, g) => sum + g.cost_usd, 0);
-            const Icon = t.icon;
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "group relative flex flex-col items-start gap-1 px-4 py-3 text-left transition-colors",
-                  active ? "bg-card" : "bg-card/40 hover:bg-muted/40",
-                )}
-              >
-                {active ? (
-                  <div className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
-                ) : null}
-                <div className="flex w-full items-center justify-between">
-                  <span
-                    className={cn(
-                      "font-mono text-[10px] uppercase tracking-[0.16em]",
-                      active ? "text-primary" : "text-muted-foreground",
-                    )}
-                  >
-                    /{t.marker}
-                  </span>
-                  <Icon className="h-3 w-3 text-muted-foreground" />
-                </div>
-                <p className="text-[12.5px] font-medium">{t.label}</p>
-                <p className="font-mono text-[13.5px] tabular-nums">
-                  {formatMoney(cost)}
-                </p>
-                <p className="font-mono text-[10px] text-muted-foreground tabular-nums">
-                  {groups.length} {groups.length === 1 ? "row" : "rows"}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        <CostTable
-          dimension={tab}
-          groups={activeGroups}
+        <ActionTable
+          actions={overview.byAction}
           totalCost={totals.cost_usd}
-          emptyKeyLabel={activeTab.emptyKey}
-          searchPlaceholder={`Search ${activeTab.label.replace("By ", "").toLowerCase()}…`}
+          onSelect={handleSelectAction}
         />
       </section>
+
+      <ActionDetailSheet
+        action={selectedAction}
+        fromDays={range}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
     </div>
   );
 }
