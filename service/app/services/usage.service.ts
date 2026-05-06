@@ -15,6 +15,7 @@ const buildQuery = (filters?: UsageQueryFilters): string => {
   if (filters.provider) params.set("provider", filters.provider);
   if (filters.clerk_org_id) params.set("clerk_org_id", filters.clerk_org_id);
   if (filters.clerk_user_id) params.set("clerk_user_id", filters.clerk_user_id);
+  if (filters.action) params.set("action", filters.action);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 };
