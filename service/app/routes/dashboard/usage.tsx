@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   AlertTriangle,
   RefreshCw,
@@ -17,8 +17,7 @@ import type { UsageGroup, UsageQueryFilters } from "~/types/usage.types";
 
 type Range = 7 | 30 | 90;
 
-const FILTER_LABELS: Record<keyof UsageQueryFilters, string> = {
-  fromDays: "range",
+const FILTER_LABELS: Partial<Record<keyof UsageQueryFilters, string>> = {
   app: "app",
   provider: "provider",
   clerk_org_id: "org",
@@ -27,40 +26,58 @@ const FILTER_LABELS: Record<keyof UsageQueryFilters, string> = {
 };
 
 export default function UsagePage() {
-  const [range, setRange] = useState<Range>(7);
-  const [filters, setFilters] = useState<UsageQueryFilters>({});
+  const {
+    overview,
+    loading,
+    error,
+    canaryRunning,
+    refetch,
+    runCanary,
+    filters,
+    setFilters,
+  } = useUsage({ fromDays: 7 });
+
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const fullFilters: UsageQueryFilters = useMemo(
-    () => ({ ...filters, fromDays: range }),
-    [filters, range],
+  const range = (filters.fromDays ?? 7) as Range;
+
+  const setRange = useCallback(
+    (r: Range) => {
+      setFilters((prev) => ({ ...prev, fromDays: r }));
+    },
+    [setFilters],
   );
 
-  const { overview, loading, error, canaryRunning, refetch, runCanary, setFilters: setHookFilters } =
-    useUsage(fullFilters);
+  const removeFilter = useCallback(
+    (key: keyof UsageQueryFilters) => {
+      setFilters((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    },
+    [setFilters],
+  );
 
-  useEffect(() => {
-    setHookFilters(fullFilters);
-  }, [fullFilters, setHookFilters]);
+  const clearFilters = useCallback(() => {
+    setFilters((prev) => ({ fromDays: prev.fromDays ?? 7 }));
+  }, [setFilters]);
 
-  const handleSelectAction = (action: UsageGroup) => {
+  const handleSelectAction = useCallback((action: UsageGroup) => {
     setSelectedAction(action.key);
     setSheetOpen(true);
-  };
+  }, []);
 
-  const removeFilter = (key: keyof UsageQueryFilters) => {
-    setFilters((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  };
-
-  const activeFilterEntries = (Object.entries(filters) as [
-    keyof UsageQueryFilters,
-    string | number | undefined,
-  ][]).filter(([, v]) => v !== undefined && v !== "");
+  const activeFilterEntries = (
+    Object.entries(filters) as [keyof UsageQueryFilters, unknown][]
+  ).filter(
+    ([key, value]) =>
+      key !== "fromDays" &&
+      key in FILTER_LABELS &&
+      value !== undefined &&
+      value !== "",
+  );
 
   if (loading && !overview.totals.requests) {
     return (
@@ -167,19 +184,19 @@ export default function UsagePage() {
               className="group inline-flex items-center gap-1.5 border bg-card px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:border-destructive/40 hover:text-destructive"
             >
               <span className="text-muted-foreground group-hover:text-destructive">
-                {FILTER_LABELS[key] ?? key}:
+                {FILTER_LABELS[key]}:
               </span>
               <span className="tabular-nums">
                 {String(value).length > 28
                   ? `${String(value).slice(0, 12)}…${String(value).slice(-6)}`
-                  : value}
+                  : String(value)}
               </span>
               <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
             </button>
           ))}
           <button
             type="button"
-            onClick={() => setFilters({})}
+            onClick={clearFilters}
             className="ml-1 text-[11px] uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
             clear all
