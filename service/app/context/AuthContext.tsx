@@ -118,21 +118,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isLoaded = clerkLoaded && orgLoaded && listLoaded;
 
-  const value: AuthContextType = {
-    isLoaded,
-    isSignedIn: !!isSignedIn,
-    userId: user?.id,
-    userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
-    userName: user?.fullName ?? null,
-    userImageUrl: user?.imageUrl ?? null,
-    organizationId: organization?.id,
-    organizationName: organization?.name,
-    organizationSlug: organization?.slug,
-    role,
-    organizations,
-    setActiveOrganization,
-    authFetch,
-  };
+  const value: AuthContextType = useMemo(
+    () => ({
+      isLoaded,
+      isSignedIn: !!isSignedIn,
+      userId: user?.id,
+      userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
+      userName: user?.fullName ?? null,
+      userImageUrl: user?.imageUrl ?? null,
+      organizationId: organization?.id,
+      organizationName: organization?.name,
+      organizationSlug: organization?.slug,
+      role,
+      organizations,
+      setActiveOrganization,
+      authFetch,
+    }),
+    [
+      isLoaded,
+      isSignedIn,
+      user?.id,
+      user?.primaryEmailAddress?.emailAddress,
+      user?.fullName,
+      user?.imageUrl,
+      organization?.id,
+      organization?.name,
+      organization?.slug,
+      role,
+      organizations,
+      setActiveOrganization,
+      authFetch,
+    ],
+  );
 
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
