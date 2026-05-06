@@ -9,6 +9,7 @@ const UsageEvent = sqliteTable(
     app: text().notNull(),
     clerk_user_id: text(),
     clerk_org_id: text(),
+    action: text(),
     provider: text().notNull(),
     model: text(),
     prompt_tokens: integer(),
@@ -23,6 +24,7 @@ const UsageEvent = sqliteTable(
     tenantOrg: index("idx_usage_tenant_org").on(t.tenant_id, t.clerk_org_id, t.timestamp),
     tenantUser: index("idx_usage_tenant_user").on(t.tenant_id, t.clerk_user_id, t.timestamp),
     tenantProvider: index("idx_usage_tenant_provider").on(t.tenant_id, t.provider, t.timestamp),
+    tenantAction: index("idx_usage_tenant_action").on(t.tenant_id, t.action, t.timestamp),
   }),
 );
 

@@ -1,4 +1,4 @@
-export type UsageDimension = "app" | "org" | "user" | "provider" | "model";
+export type UsageDimension = "app" | "org" | "user" | "provider" | "model" | "action";
 
 export interface UsageGroup {
   key: string | null;
@@ -34,6 +34,7 @@ export interface UsageOverview {
   byUser: UsageGroup[];
   byProvider: UsageGroup[];
   byModel: UsageGroup[];
+  byAction: UsageGroup[];
 }
 
 export interface UsageQueryFilters {

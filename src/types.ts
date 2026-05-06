@@ -16,6 +16,7 @@ export interface VeTrackEvent {
   app: string;
   clerk_user_id: string | null;
   clerk_org_id: string | null;
+  action: string | null;
   provider: string;
   model: string | null;
   prompt_tokens: number | null;
@@ -32,7 +33,9 @@ export interface RequestScope {
   baseUrl: string;
   userId: string | null;
   orgId: string | null;
+  action: string | null;
   buffer: VeTrackEvent[];
+  pending: Promise<unknown>[];
 }
 
 export interface Provider {
