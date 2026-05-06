@@ -30,6 +30,7 @@ const baseFilters = (
   provider: query.provider || undefined,
   clerk_org_id: query.clerk_org_id || undefined,
   clerk_user_id: query.clerk_user_id || undefined,
+  action: query.action || undefined,
 });
 
 const validateEvent = (e: UsageEventInput) => {
@@ -55,6 +56,7 @@ class UsageEventService {
     }
 
     const valid = body.events.filter(validateEvent);
+    console.log("[ve-track][ingest-svc] valid events", { received: body.events.length, valid: valid.length });
     const rows = valid.map((e) => ({
       id: e.id,
       tenant_id: tenantId,
@@ -62,6 +64,7 @@ class UsageEventService {
       app: body.app,
       clerk_user_id: e.clerk_user_id ?? null,
       clerk_org_id: e.clerk_org_id ?? null,
+      action: e.action ?? null,
       provider: e.provider,
       model: e.model ?? null,
       prompt_tokens: e.prompt_tokens ?? null,
@@ -145,6 +148,20 @@ class UsageEventService {
     const groups = await UsageEventRepository.groupBy(
       db,
       "model",
+      baseFilters(tenantId, query, fromDays),
+    );
+    return this.respond(groups, fromDays);
+  }
+
+  static async getByAction(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query: UsageQuery,
+  ) {
+    const fromDays = parseFromDays(query.fromDays);
+    const groups = await UsageEventRepository.groupBy(
+      db,
+      "action",
       baseFilters(tenantId, query, fromDays),
     );
     return this.respond(groups, fromDays);

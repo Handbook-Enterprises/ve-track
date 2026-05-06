@@ -13,6 +13,7 @@ v1Router.get("/usage/by-org", UsageEventController.byOrgController);
 v1Router.get("/usage/by-user", UsageEventController.byUserController);
 v1Router.get("/usage/by-provider", UsageEventController.byProviderController);
 v1Router.get("/usage/by-model", UsageEventController.byModelController);
+v1Router.get("/usage/by-action", UsageEventController.byActionController);
 v1Router.get("/usage/totals", UsageEventController.totalsController);
 v1Router.post("/canary", UsageEventController.canaryController);
 

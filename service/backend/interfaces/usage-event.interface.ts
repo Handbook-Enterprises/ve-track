@@ -3,6 +3,7 @@ export interface UsageEventInput {
   timestamp: number;
   clerk_user_id: string | null;
   clerk_org_id: string | null;
+  action: string | null;
   provider: string;
   model: string | null;
   prompt_tokens: number | null;
@@ -23,6 +24,7 @@ export interface UsageQuery {
   provider?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
+  action?: string;
 }
 
 export interface UsageGroup {

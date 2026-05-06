@@ -74,6 +74,16 @@ class UsageEventController {
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
 
+  static async byActionController(c: TenantContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      UsageEventService.getByAction(db, tenantId, c.req.query() as UsageQuery),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
   static async totalsController(c: TenantContext) {
     const db = drizzle(c.env.DB);
     const tenantId = c.get("tenantId");

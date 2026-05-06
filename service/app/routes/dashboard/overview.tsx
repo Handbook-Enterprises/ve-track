@@ -7,6 +7,7 @@ import {
   Plug,
   Receipt,
   Sparkles,
+  Target,
   Users,
 } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
@@ -24,6 +25,84 @@ const formatUsd = (n: number): string => formatMoney(n);
 
 const dailyAverage = (cost: number, days: number): string =>
   formatMoney(days > 0 ? cost / days : 0);
+
+const ActionCostBoard = ({
+  actions,
+  totalCost,
+  fromDays,
+}: {
+  actions: UsageGroup[];
+  totalCost: number;
+  fromDays: number;
+}) => {
+  const top = actions.slice(0, 4);
+  if (top.length === 0) {
+    return (
+      <div className="border bg-card px-6 py-10 text-center">
+        <Target className="mx-auto h-5 w-5 text-muted-foreground" />
+        <p className="mt-3 text-[13px] font-medium">No tagged actions yet.</p>
+        <p className="mx-auto mt-1.5 max-w-md text-[12px] leading-relaxed text-muted-foreground">
+          Wrap your work with a `withAction("ai-search")` block (or set
+          `scope.action` per queue message) and the average cost per run shows
+          up here — that's the input you need to set credit prices.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+      {top.map((g, i) => {
+        const avg = g.requests > 0 ? g.cost_usd / g.requests : 0;
+        const share = totalCost > 0 ? (g.cost_usd / totalCost) * 100 : 0;
+        const isTop = i === 0;
+        return (
+          <article
+            key={`${g.key ?? "null"}-${i}`}
+            className={cn(
+              "relative flex flex-col gap-3 bg-card p-5",
+              isTop && "ring-1 ring-inset ring-primary/40",
+            )}
+          >
+            {isTop ? (
+              <div className="absolute inset-x-0 top-0 h-px bg-primary" />
+            ) : null}
+            <div className="flex items-center justify-between">
+              <p
+                className={cn(
+                  "font-mono text-[10px] uppercase tracking-[0.16em]",
+                  isTop ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                {String(i + 1).padStart(2, "0")} · action
+              </p>
+              <Target
+                className={cn(
+                  "h-3.5 w-3.5",
+                  isTop ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+            </div>
+            <p className="truncate text-[14.5px] font-semibold leading-tight">
+              {g.key || "Untagged"}
+            </p>
+            <div>
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+                avg cost / run
+              </p>
+              <p className="mt-1 font-mono text-[1.7rem] font-medium leading-none tabular-nums">
+                {formatUsd(avg)}
+              </p>
+            </div>
+            <div className="mt-auto flex items-center justify-between border-t border-foreground/10 pt-2 font-mono text-[10.5px] tabular-nums text-muted-foreground">
+              <span>{g.requests.toLocaleString()} runs · {fromDays}d</span>
+              <span>{share >= 1 ? `${Math.round(share)}%` : `<1%`} of spend</span>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+};
 
 const TopList = ({
   title,
@@ -238,7 +317,24 @@ export default function OverviewPage() {
       <section className="space-y-3">
         <div className="flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            ── /02 · attribution
+            ── /02 · cost per action
+          </p>
+          <p className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+            for credit pricing
+          </p>
+        </div>
+
+        <ActionCostBoard
+          actions={overview.byAction}
+          totalCost={totals.cost_usd}
+          fromDays={totals.fromDays}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            ── /03 · attribution
           </p>
           <Link
             to="/dashboard/usage"

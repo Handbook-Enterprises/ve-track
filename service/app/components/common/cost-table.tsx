@@ -34,6 +34,7 @@ const dimensionMeta: Record<
   user: { keyLabel: "Person", subjectLabel: "person" },
   provider: { keyLabel: "Provider", subjectLabel: "provider" },
   model: { keyLabel: "Model", subjectLabel: "model" },
+  action: { keyLabel: "Action", subjectLabel: "action" },
 };
 
 const formatShare = (cost: number, total: number): string => {

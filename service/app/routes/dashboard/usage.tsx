@@ -9,6 +9,7 @@ import {
   Receipt,
   RefreshCw,
   Sparkles,
+  Target,
   User2,
 } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
@@ -34,16 +35,17 @@ const TABS: {
   icon: typeof Layers;
   emptyKey: string;
 }[] = [
-  { key: "app", marker: "01", label: "By App", icon: Layers, emptyKey: "Unattributed" },
-  { key: "org", marker: "02", label: "By Organization", icon: Building2, emptyKey: "Personal / no org" },
-  { key: "user", marker: "03", label: "By Person", icon: User2, emptyKey: "Anonymous" },
-  { key: "provider", marker: "04", label: "By Provider", icon: Plug, emptyKey: "Unknown" },
-  { key: "model", marker: "05", label: "By Model", icon: Cpu, emptyKey: "—" },
+  { key: "action", marker: "01", label: "By Action", icon: Target, emptyKey: "Untagged" },
+  { key: "app", marker: "02", label: "By App", icon: Layers, emptyKey: "Unattributed" },
+  { key: "org", marker: "03", label: "By Organization", icon: Building2, emptyKey: "Personal / no org" },
+  { key: "user", marker: "04", label: "By Person", icon: User2, emptyKey: "Anonymous" },
+  { key: "provider", marker: "05", label: "By Provider", icon: Plug, emptyKey: "Unknown" },
+  { key: "model", marker: "06", label: "By Model", icon: Cpu, emptyKey: "—" },
 ];
 
 export default function UsagePage() {
   const [range, setRange] = useState<Range>(7);
-  const [tab, setTab] = useState<UsageDimension>("app");
+  const [tab, setTab] = useState<UsageDimension>("action");
 
   const filters: UsageQueryFilters = useMemo(() => ({ fromDays: range }), [range]);
   const { overview, loading, error, canaryRunning, refetch, runCanary } =
@@ -51,6 +53,7 @@ export default function UsagePage() {
 
   const groupsByTab = useMemo(
     () => ({
+      action: overview.byAction,
       app: overview.byApp,
       org: overview.byOrg,
       user: overview.byUser,
@@ -96,6 +99,50 @@ export default function UsagePage() {
 
   const renderTopCallout = () => {
     if (!top) return null;
+    if (tab === "action") {
+      const avg = top.requests > 0 ? top.cost_usd / top.requests : 0;
+      return (
+        <section className="border border-primary/40 bg-primary/[0.04] p-5">
+          <div className="flex items-end justify-between gap-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Most expensive action · {totals.fromDays}d
+            </p>
+            <p className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+              credit pricing input
+            </p>
+          </div>
+          <p className="mt-2 text-[1.6rem] font-semibold leading-tight">
+            {top.key || activeTab.emptyKey}
+          </p>
+          <div className="mt-4 grid gap-px bg-border sm:grid-cols-3">
+            <div className="bg-card p-4">
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+                avg / run
+              </p>
+              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
+                {formatMoney(avg)}
+              </p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+                runs
+              </p>
+              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
+                {top.requests.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+                total spend
+              </p>
+              <p className="mt-1 font-mono text-[1.2rem] font-medium tabular-nums">
+                {formatMoney(top.cost_usd)}
+              </p>
+            </div>
+          </div>
+        </section>
+      );
+    }
     if (tab === "user" || tab === "org") {
       return (
         <section className="border border-primary/30 bg-primary/[0.04] p-5">
@@ -256,7 +303,7 @@ export default function UsagePage() {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-px bg-border md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-px bg-border md:grid-cols-3 lg:grid-cols-6">
           {TABS.map((t) => {
             const groups = groupsByTab[t.key];
             const cost = groups.reduce((sum, g) => sum + g.cost_usd, 0);

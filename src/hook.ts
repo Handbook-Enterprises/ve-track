@@ -40,30 +40,32 @@ export function installFetchHook(): void {
     const response = await originalFetch(input, mutableInit);
     const latencyMs = Date.now() - start;
 
-    scope.ctx.waitUntil(
-      (async () => {
-        const usage = await provider
-          .extract(response.clone())
-          .catch(() => null);
+    const extractTask = (async () => {
+      const usage = await provider
+        .extract(response.clone())
+        .catch(() => null);
 
-        const event: VeTrackEvent = {
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          app: scope.app,
-          clerk_user_id: scope.userId,
-          clerk_org_id: scope.orgId,
-          provider: provider.name,
-          model: usage?.model ?? null,
-          prompt_tokens: usage?.promptTokens ?? null,
-          completion_tokens: usage?.completionTokens ?? null,
-          latency_ms: latencyMs,
-          cost_usd: usage?.costUsd ?? null,
-          status_code: response.status,
-        };
+      const event: VeTrackEvent = {
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        app: scope.app,
+        clerk_user_id: scope.userId,
+        clerk_org_id: scope.orgId,
+        action: scope.action,
+        provider: provider.name,
+        model: usage?.model ?? null,
+        prompt_tokens: usage?.promptTokens ?? null,
+        completion_tokens: usage?.completionTokens ?? null,
+        latency_ms: latencyMs,
+        cost_usd: usage?.costUsd ?? null,
+        status_code: response.status,
+      };
 
-        scope.buffer.push(event);
-      })(),
-    );
+      scope.buffer.push(event);
+    })();
+
+    scope.pending.push(extractTask);
+    scope.ctx.waitUntil(extractTask);
 
     return response;
   }) as typeof fetch;
@@ -73,11 +75,18 @@ export function runScope<T>(
   scope: RequestScope,
   handler: () => Promise<T> | T,
 ): Promise<T> {
+  if (!scope.pending) scope.pending = [];
+  if (scope.action === undefined) scope.action = null;
   return requestContext.run(scope, async () => {
     try {
       return await Promise.resolve(handler());
     } finally {
-      scope.ctx.waitUntil(flushEvents(scope));
+      scope.ctx.waitUntil(
+        (async () => {
+          await Promise.allSettled(scope.pending);
+          await flushEvents(scope);
+        })(),
+      );
     }
   });
 }
@@ -93,6 +102,16 @@ export function withUser<T>(
     userId: user.userId,
     orgId: user.orgId,
   };
+  return Promise.resolve(requestContext.run(childScope, handler));
+}
+
+export function withAction<T>(
+  action: string,
+  handler: () => Promise<T> | T,
+): Promise<T> {
+  const scope = requestContext.getStore();
+  if (!scope) return Promise.resolve(handler());
+  const childScope: RequestScope = { ...scope, action };
   return Promise.resolve(requestContext.run(childScope, handler));
 }
 
