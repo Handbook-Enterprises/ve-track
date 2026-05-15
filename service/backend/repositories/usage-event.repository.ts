@@ -206,6 +206,48 @@ class UsageEventRepository {
       .where(and(...conditions));
     return row ?? { cost_usd: 0, requests: 0 };
   }
+
+  static async profitabilityGroupBy(
+    db: DrizzleD1Database,
+    column: keyof typeof UsageEvent.$inferSelect,
+    filters: BaseFilters,
+  ) {
+    const col = (UsageEvent as any)[column];
+    return db
+      .select({
+        key: col,
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        revenue_usd: sql<number>`COALESCE(SUM(COALESCE(${UsageEvent.credits_charged}, 0) * COALESCE(${UsageEvent.credit_price_usd_at_event}, 0)), 0)`,
+        credits_charged: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(buildWhere(filters))
+      .groupBy(col)
+      .orderBy(
+        desc(
+          sql`(COALESCE(SUM(COALESCE(${UsageEvent.credits_charged}, 0) * COALESCE(${UsageEvent.credit_price_usd_at_event}, 0)), 0) - COALESCE(SUM(${UsageEvent.cost_usd}), 0))`,
+        ),
+      );
+  }
+
+  static async profitabilityTotals(
+    db: DrizzleD1Database,
+    filters: BaseFilters,
+  ) {
+    const [row] = await db
+      .select({
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        revenue_usd: sql<number>`COALESCE(SUM(COALESCE(${UsageEvent.credits_charged}, 0) * COALESCE(${UsageEvent.credit_price_usd_at_event}, 0)), 0)`,
+        credits_charged: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(buildWhere(filters));
+    return (
+      row ?? { cost_usd: 0, revenue_usd: 0, credits_charged: 0, requests: 0 }
+    );
+  }
 }
 
 export { UsageEventRepository };

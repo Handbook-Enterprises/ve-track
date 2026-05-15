@@ -11,6 +11,9 @@ export interface UsageEventInput {
   latency_ms: number | null;
   cost_usd: number | null;
   status_code: number | null;
+  credits_charged: number | null;
+  credit_price_usd_at_event: number | null;
+  correlation_id: string | null;
 }
 
 export interface IngestBody {
@@ -51,4 +54,26 @@ export interface UsageTotals {
   requests: number;
   fromDays: number;
   delta?: UsageDelta;
+}
+
+export interface ProfitabilityGroup {
+  key: string | null;
+  revenue_usd: number;
+  cost_usd: number;
+  margin_usd: number;
+  margin_pct: number | null;
+  credits_charged: number;
+  requests: number;
+  name?: string | null;
+  secondary?: string | null;
+}
+
+export interface ProfitabilityTotals {
+  revenue_usd: number;
+  cost_usd: number;
+  margin_usd: number;
+  margin_pct: number | null;
+  credits_charged: number;
+  requests: number;
+  fromDays: number;
 }

@@ -15,6 +15,14 @@ v1Router.get("/usage/by-provider", UsageEventController.byProviderController);
 v1Router.get("/usage/by-model", UsageEventController.byModelController);
 v1Router.get("/usage/by-action", UsageEventController.byActionController);
 v1Router.get("/usage/totals", UsageEventController.totalsController);
+v1Router.get(
+  "/breakdown/profitability",
+  UsageEventController.profitabilityController,
+);
+v1Router.get(
+  "/breakdown/profitability/totals",
+  UsageEventController.profitabilityTotalsController,
+);
 v1Router.post("/canary", UsageEventController.canaryController);
 
 export default v1Router;

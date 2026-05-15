@@ -5,11 +5,41 @@ import { CustomError } from "../utils";
 import { HTTP_STATUS_CODES } from "../constants";
 import type {
   IngestBody,
+  ProfitabilityGroup,
+  ProfitabilityTotals,
   UsageEventInput,
   UsageGroup,
   UsageQuery,
   UsageTotals,
 } from "../interfaces/usage-event.interface";
+
+type ProfitabilityDimension =
+  | "app"
+  | "action"
+  | "clerk_org_id"
+  | "clerk_user_id"
+  | "provider";
+
+const PROFITABILITY_DIM_MAP: Record<string, ProfitabilityDimension> = {
+  app: "app",
+  action: "action",
+  org: "clerk_org_id",
+  clerk_org_id: "clerk_org_id",
+  user: "clerk_user_id",
+  clerk_user_id: "clerk_user_id",
+  provider: "provider",
+};
+
+const resolveProfitabilityDim = (raw?: string): ProfitabilityDimension => {
+  if (!raw) return "action";
+  return PROFITABILITY_DIM_MAP[raw] ?? "action";
+};
+
+const computeMargin = (revenue: number, cost: number) => {
+  const margin_usd = revenue - cost;
+  const margin_pct = revenue > 0 ? (margin_usd / revenue) * 100 : null;
+  return { margin_usd, margin_pct };
+};
 
 const DEFAULT_FROM_DAYS = 7;
 
@@ -72,6 +102,9 @@ class UsageEventService {
       latency_ms: e.latency_ms ?? null,
       cost_usd: e.cost_usd ?? null,
       status_code: e.status_code ?? null,
+      credits_charged: e.credits_charged ?? null,
+      credit_price_usd_at_event: e.credit_price_usd_at_event ?? null,
+      correlation_id: e.correlation_id ?? null,
     }));
 
     const inserted = await UsageEventRepository.insertMany(db, rows);
@@ -198,6 +231,85 @@ class UsageEventService {
       success: true,
       message: UsageEventMessages.FETCH_SUCCESS,
       totals: result,
+    };
+  }
+
+  static async getProfitabilityBy(
+    db: DrizzleD1Database,
+    tenantId: string,
+    by: string | undefined,
+    query: UsageQuery,
+  ) {
+    const dim = resolveProfitabilityDim(by);
+    const fromDays = parseFromDays(query.fromDays);
+    const rows = await UsageEventRepository.profitabilityGroupBy(
+      db,
+      dim,
+      baseFilters(tenantId, query, fromDays),
+    );
+    const groups: ProfitabilityGroup[] = rows.map((r) => {
+      const revenue = Number(r.revenue_usd ?? 0);
+      const cost = Number(r.cost_usd ?? 0);
+      const { margin_usd, margin_pct } = computeMargin(revenue, cost);
+      return {
+        key: r.key as string | null,
+        revenue_usd: revenue,
+        cost_usd: cost,
+        margin_usd,
+        margin_pct,
+        credits_charged: Number(r.credits_charged ?? 0),
+        requests: Number(r.requests ?? 0),
+      };
+    });
+    const totalRevenue = groups.reduce((s, g) => s + g.revenue_usd, 0);
+    const totalCost = groups.reduce((s, g) => s + g.cost_usd, 0);
+    const totalCredits = groups.reduce((s, g) => s + g.credits_charged, 0);
+    const totalRequests = groups.reduce((s, g) => s + g.requests, 0);
+    const { margin_usd, margin_pct } = computeMargin(totalRevenue, totalCost);
+    const totals: ProfitabilityTotals = {
+      revenue_usd: totalRevenue,
+      cost_usd: totalCost,
+      margin_usd,
+      margin_pct,
+      credits_charged: totalCredits,
+      requests: totalRequests,
+      fromDays,
+    };
+    return {
+      success: true,
+      message: UsageEventMessages.FETCH_SUCCESS,
+      dimension: dim,
+      groups,
+      totals,
+    };
+  }
+
+  static async getProfitabilityTotals(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query: UsageQuery,
+  ) {
+    const fromDays = parseFromDays(query.fromDays);
+    const row = await UsageEventRepository.profitabilityTotals(
+      db,
+      baseFilters(tenantId, query, fromDays),
+    );
+    const revenue = Number(row.revenue_usd ?? 0);
+    const cost = Number(row.cost_usd ?? 0);
+    const { margin_usd, margin_pct } = computeMargin(revenue, cost);
+    const totals: ProfitabilityTotals = {
+      revenue_usd: revenue,
+      cost_usd: cost,
+      margin_usd,
+      margin_pct,
+      credits_charged: Number(row.credits_charged ?? 0),
+      requests: Number(row.requests ?? 0),
+      fromDays,
+    };
+    return {
+      success: true,
+      message: UsageEventMessages.FETCH_SUCCESS,
+      totals,
     };
   }
 
