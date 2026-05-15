@@ -1,4 +1,4 @@
-import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, real, index } from "drizzle-orm/sqlite-core";
 import { timestamps } from "../utils";
 
 const Tenant = sqliteTable(
@@ -11,6 +11,7 @@ const Tenant = sqliteTable(
     clerk_org_id: text(),
     clerk_user_id: text(),
     plan: text().notNull().default("free"),
+    credit_price_usd: real().notNull().default(0.01),
     ...timestamps,
   },
   (t) => ({

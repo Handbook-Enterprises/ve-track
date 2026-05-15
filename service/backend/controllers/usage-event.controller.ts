@@ -103,6 +103,31 @@ class UsageEventController {
     if (error) throw error;
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
+
+  static async profitabilityController(c: TenantContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const { by, ...rest } = c.req.query() as UsageQuery & { by?: string };
+    const [error, data] = await manageAsyncOps(
+      UsageEventService.getProfitabilityBy(db, tenantId, by, rest as UsageQuery),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async profitabilityTotalsController(c: TenantContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      UsageEventService.getProfitabilityTotals(
+        db,
+        tenantId,
+        c.req.query() as UsageQuery,
+      ),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
 }
 
 export default UsageEventController;
