@@ -1,5 +1,7 @@
+import * as Sentry from "@sentry/cloudflare";
 import { createRequestHandler } from "react-router";
 import honoApi from "../backend";
+import { SENTRY_DSN } from "~/lib/sentry";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -15,7 +17,7 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
-export default {
+const handler = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
@@ -28,3 +30,15 @@ export default {
     });
   },
 } satisfies ExportedHandler<Env>;
+
+export default import.meta.env.PROD
+  ? Sentry.withSentry(
+      () => ({
+        dsn: SENTRY_DSN,
+        tracesSampleRate: 0.1,
+        enableLogs: true,
+        sendDefaultPii: true,
+      }),
+      handler,
+    )
+  : handler;

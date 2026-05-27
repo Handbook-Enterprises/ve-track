@@ -5,10 +5,12 @@
   "scripts": {
     "build": "react-router build",
     "cf-typegen": "wrangler types",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
     "dev": "react-router dev --port 5174 --host 127.0.0.1",
+    "postdeploy": "npm run sentry:sourcemaps",
     "postinstall": "npm run cf-typegen",
     "preview": "npm run build && vite preview",
+    "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=viewengine --project=viewengine-platform && sentry-cli sourcemaps upload --org=viewengine --project=viewengine-platform --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
     "typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
   },
   "dependencies": {
@@ -20,6 +22,8 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/space-grotesk": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
+    "@sentry/cloudflare": "^10.49.0",
+    "@sentry/react": "^10.49.0",
     "@tanstack/react-table": "^8.21.3",
     "@viewengine/track": "link:..",
     "axios": "^1.13.5",
@@ -55,6 +59,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.13.5",
     "@react-router/dev": "^7.9.2",
+    "@sentry/cli": "^2",
     "@tailwindcss/vite": "^4.1.13",
     "@types/node": "^22",
     "@types/react": "^19.1.13",

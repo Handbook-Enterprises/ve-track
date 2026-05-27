@@ -1,23 +1,7 @@
-import { useMemo, useState } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type ColumnDef,
-  type SortingState,
-} from "@tanstack/react-table";
+import { useMemo } from "react";
+import { type ColumnDef } from "@tanstack/react-table";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  KeyRound,
-  Search,
-  ShieldOff,
-  Trash2,
-} from "lucide-react";
+import { KeyRound, ShieldOff, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
+import { DataTable } from "~/components/ui/data-table";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 import ApiKeyForm from "~/components/api-key/ApiKeyForm";
 import ApiKeyRevealDialog from "~/components/api-key/ApiKeyRevealDialog";
@@ -48,11 +33,6 @@ export default function KeysPage() {
     revoke,
   } = useApiKeys();
 
-  const [filter, setFilter] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "created_at", desc: true },
-  ]);
-
   const liveCount = apiKeys.filter((k) => !k.revoked_at).length;
   const revokedCount = apiKeys.filter((k) => k.revoked_at).length;
 
@@ -65,8 +45,9 @@ export default function KeysPage() {
         filterFn: (row, _id, value) => {
           const v = String(value ?? "").toLowerCase();
           if (!v) return true;
-          return [row.original.name, row.original.prefix]
-            .some((s) => String(s).toLowerCase().includes(v));
+          return [row.original.name, row.original.prefix].some((s) =>
+            String(s).toLowerCase().includes(v),
+          );
         },
         cell: ({ row }) => {
           const revoked = !!row.original.revoked_at;
@@ -91,6 +72,7 @@ export default function KeysPage() {
         id: "prefix",
         accessorKey: "prefix",
         header: () => <span>Prefix</span>,
+        meta: { headClassName: "w-40", cellClassName: "w-40" },
         cell: ({ row }) => (
           <span className="font-mono text-[12px] tabular-nums">
             {row.original.prefix}…
@@ -100,7 +82,8 @@ export default function KeysPage() {
       {
         id: "created_at",
         accessorKey: "created_at",
-        header: () => <span className="block w-full text-right">Created</span>,
+        header: () => <span>Created</span>,
+        meta: { align: "right", headClassName: "w-40", cellClassName: "w-40" },
         cell: ({ row }) => {
           const d = new Date(row.original.created_at);
           return (
@@ -118,7 +101,8 @@ export default function KeysPage() {
       {
         id: "actions",
         enableSorting: false,
-        header: () => <span className="block w-full text-right">Actions</span>,
+        header: () => <span>Actions</span>,
+        meta: { align: "right", headClassName: "w-40", cellClassName: "w-40" },
         cell: ({ row }) => {
           const apiKey = row.original;
           const revoked = !!apiKey.revoked_at;
@@ -163,16 +147,6 @@ export default function KeysPage() {
     [revoke],
   );
 
-  const table = useReactTable({
-    data: apiKeys,
-    columns,
-    state: { sorting, columnFilters: filter ? [{ id: "name", value: filter }] : [] },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-  });
-
   return (
     <div className="space-y-10 pb-16">
       <header className="border-b border-foreground/15 pb-7">
@@ -213,100 +187,16 @@ export default function KeysPage() {
         ) : apiKeys.length === 0 ? (
           <EmptyState />
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative max-w-xs flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Filter by name or prefix…"
-                  className="h-9 w-full border bg-card pl-8 pr-3 text-[12.5px] placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="border bg-card">
-              <table className="w-full border-collapse">
-                <thead>
-                  {table.getHeaderGroups().map((hg) => (
-                    <tr
-                      key={hg.id}
-                      className="border-b text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
-                    >
-                      {hg.headers.map((header, i) => {
-                        const sortDir = header.column.getIsSorted();
-                        const canSort = header.column.getCanSort();
-                        return (
-                          <th
-                            key={header.id}
-                            className={cn(
-                              "px-4 py-2.5 text-left font-medium",
-                              i === 0 ? "" : "w-40",
-                            )}
-                          >
-                            {canSort ? (
-                              <button
-                                type="button"
-                                onClick={header.column.getToggleSortingHandler()}
-                                className={cn(
-                                  "inline-flex w-full items-center gap-1.5 transition-colors hover:text-foreground",
-                                  i > 0 && "justify-end",
-                                )}
-                              >
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                {sortDir === "asc" ? (
-                                  <ArrowUp className="h-3 w-3" />
-                                ) : sortDir === "desc" ? (
-                                  <ArrowDown className="h-3 w-3" />
-                                ) : (
-                                  <ArrowUpDown className="h-3 w-3 opacity-40" />
-                                )}
-                              </button>
-                            ) : (
-                              flexRender(header.column.columnDef.header, header.getContext())
-                            )}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {table.getRowModel().rows.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={columns.length}
-                        className="px-4 py-12 text-center text-[12.5px] text-muted-foreground"
-                      >
-                        No keys match "{filter}".
-                      </td>
-                    </tr>
-                  ) : (
-                    table.getRowModel().rows.map((row) => (
-                      <tr
-                        key={row.id}
-                        className={cn(
-                          "border-b transition-colors last:border-b-0 hover:bg-muted/30",
-                          !!row.original.revoked_at && "opacity-60",
-                        )}
-                      >
-                        {row.getVisibleCells().map((cell, i) => (
-                          <td
-                            key={cell.id}
-                            className={cn("px-4 py-3 align-middle", i > 0 && "w-40")}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <DataTable
+            columns={columns}
+            data={apiKeys}
+            initialSorting={[{ id: "created_at", desc: true }]}
+            searchColumnId="name"
+            searchPlaceholder="Filter by name or prefix…"
+            rowClassName={(row) => (row.revoked_at ? "opacity-60" : undefined)}
+            emptyMessage="No keys to show."
+            emptyFilteredMessage={(q) => `No keys match "${q}".`}
+          />
         )}
       </section>
 

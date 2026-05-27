@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { rootAuthLoader } from "@clerk/react-router/server";
+import * as Sentry from "@sentry/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -15,6 +16,7 @@ import { Toaster } from "~/components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { TenantProvider } from "./context/TenantContext";
 import ClerkThemedProvider from "./components/common/clerk-themed-provider";
+import SentryUserSync from "./components/common/SentryUserSync";
 
 export const loader = (args: Route.LoaderArgs) => rootAuthLoader(args);
 
@@ -63,6 +65,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
     >
       <AuthProvider>
         <TenantProvider>
+          <SentryUserSync />
           <Outlet />
         </TenantProvider>
       </AuthProvider>
@@ -81,9 +84,12 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       error.status === 404
         ? "The requested page could not be found."
         : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
+  } else if (error && error instanceof Error) {
+    Sentry.captureException(error);
+    if (import.meta.env.DEV) {
+      details = error.message;
+      stack = error.stack;
+    }
   }
 
   return (
