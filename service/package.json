@@ -2,7 +2,11 @@
   "name": "ve-track-service",
   "private": true,
   "type": "module",
+  "bin": {
+    "ve-track": "cli/ve-track.ts"
+  },
   "scripts": {
+    "ve-track": "bun cli/ve-track.ts",
     "build": "react-router build",
     "cf-typegen": "wrangler types",
     "deploy": "npm run build && wrangler deploy --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
@@ -30,6 +34,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "commander": "^14.0.3",
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
