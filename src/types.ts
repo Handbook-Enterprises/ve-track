@@ -57,12 +57,12 @@ export interface TrackedHandlerConfig<E> {
   appUrl?: (env: E) => string | undefined;
   resolveUser?: UserResolver<E>;
   fetch: (
-    req: Request,
+    req: Request<unknown, IncomingRequestCfProperties<unknown>>,
     env: E,
     ctx: ExecutionContext,
   ) => Response | Promise<Response>;
   scheduled?: (
-    event: ScheduledEvent,
+    event: ScheduledController,
     env: E,
     ctx: ExecutionContext,
   ) => void | Promise<void>;

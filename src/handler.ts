@@ -34,7 +34,9 @@ const buildScope = <E>(
     baseUrl,
     userId: user.userId,
     orgId: user.orgId,
+    action: null,
     buffer: [],
+    pending: [],
   };
 };
 
