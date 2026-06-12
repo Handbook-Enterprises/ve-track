@@ -115,6 +115,40 @@ export function withAction<T>(
   return Promise.resolve(requestContext.run(childScope, handler));
 }
 
+export interface TrackUsageInput {
+  provider: string;
+  costUsd?: number | null;
+  model?: string | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  latencyMs?: number | null;
+  statusCode?: number | null;
+  action?: string;
+  userId?: string | null;
+  orgId?: string | null;
+}
+
+export function trackUsage(usage: TrackUsageInput): void {
+  const scope = requestContext.getStore();
+  if (!scope) return;
+  const event: VeTrackEvent = {
+    id: crypto.randomUUID(),
+    timestamp: Date.now(),
+    app: scope.app,
+    clerk_user_id: usage.userId !== undefined ? usage.userId : scope.userId,
+    clerk_org_id: usage.orgId !== undefined ? usage.orgId : scope.orgId,
+    action: usage.action ?? scope.action,
+    provider: usage.provider,
+    model: usage.model ?? null,
+    prompt_tokens: usage.promptTokens ?? null,
+    completion_tokens: usage.completionTokens ?? null,
+    latency_ms: usage.latencyMs ?? null,
+    cost_usd: usage.costUsd ?? null,
+    status_code: usage.statusCode ?? null,
+  };
+  scope.buffer.push(event);
+}
+
 export function getCurrentScope(): RequestScope | undefined {
   return requestContext.getStore();
 }
