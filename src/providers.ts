@@ -31,6 +31,12 @@ const MODEL_PRICING: Array<{ match: RegExp; price: ModelPrice }> = [
   { match: /^claude-3-sonnet/i, price: { inputPerM: 3, outputPerM: 15 } },
   { match: /^claude-3-haiku/i, price: { inputPerM: 0.25, outputPerM: 1.25 } },
 
+  { match: /^sonar-deep-research/i, price: { inputPerM: 2, outputPerM: 8 } },
+  { match: /^sonar-reasoning-pro/i, price: { inputPerM: 2, outputPerM: 8 } },
+  { match: /^sonar-reasoning/i, price: { inputPerM: 1, outputPerM: 5 } },
+  { match: /^sonar-pro/i, price: { inputPerM: 3, outputPerM: 15 } },
+  { match: /^sonar/i, price: { inputPerM: 1, outputPerM: 1 } },
+
   { match: /^gemini-2\.5-pro/i, price: { inputPerM: 1.25, outputPerM: 10 } },
   { match: /^gemini-2\.5-flash-lite/i, price: { inputPerM: 0.1, outputPerM: 0.4 } },
   { match: /^gemini-2\.5-flash/i, price: { inputPerM: 0.3, outputPerM: 2.5 } },
@@ -60,6 +66,19 @@ const computeCost = (
   const cost = (input + output) / 1_000_000;
   return Math.round(cost * 1_000_000) / 1_000_000;
 };
+
+const CLORO_USD_PER_CREDIT = 0.0004;
+const FAL_IMAGE_USD = 0.01;
+
+export const cloroCreditsToUsd = (credits: number): number =>
+  Math.round(credits * CLORO_USD_PER_CREDIT * 1_000_000) / 1_000_000;
+
+const CLORO_SYNC_ENDPOINTS: Array<{ match: RegExp; credits: number; model: string }> = [
+  { match: /\/monitor\/chatgpt/i, credits: 7, model: "chatgpt" },
+  { match: /\/monitor\/perplexity/i, credits: 5, model: "perplexity" },
+  { match: /\/monitor\/gemini/i, credits: 6, model: "gemini" },
+  { match: /\/monitor\/aimode/i, credits: 6, model: "aimode" },
+];
 
 export const PROVIDERS: Provider[] = [
   {
@@ -159,6 +178,64 @@ export const PROVIDERS: Provider[] = [
       const model = j.modelVersion ?? j.model ?? j.model_version ?? null;
       const costUsd = computeCost(model, promptTokens, completionTokens);
       return { costUsd, model, promptTokens, completionTokens };
+    },
+  },
+  {
+    name: "perplexity",
+    match: (u) => u.includes("api.perplexity.ai"),
+    extract: async (resp) => {
+      if (resp.headers.get("content-type")?.includes("event-stream")) return null;
+      const j: any = await resp.clone().json().catch(() => null);
+      if (!j?.usage) return null;
+      const promptTokens = j.usage.prompt_tokens;
+      const completionTokens = j.usage.completion_tokens;
+      const explicit = j.usage.cost?.total_cost;
+      const costUsd =
+        typeof explicit === "number"
+          ? explicit
+          : computeCost(j.model, promptTokens, completionTokens);
+      return { costUsd, model: j.model, promptTokens, completionTokens };
+    },
+  },
+  {
+    name: "cloro",
+    match: (u) => u.includes("api.cloro.dev"),
+    extract: async (resp) => {
+      try {
+        if (/\/async\/task\/?$/i.test(new URL(resp.url).pathname)) return null;
+      } catch {
+        /* */
+      }
+      const j: any = await resp.clone().json().catch(() => null);
+      const credits = j?.credits?.creditsCharged ?? j?.credits?.creditsToCharge;
+      const taskType = j?.task?.taskType ?? j?.result?.taskType;
+      const sync = CLORO_SYNC_ENDPOINTS.find((s) => s.match.test(resp.url));
+      const model =
+        typeof taskType === "string" ? taskType.toLowerCase() : (sync?.model ?? null);
+      if (typeof credits === "number") {
+        return { costUsd: cloroCreditsToUsd(credits), model: model ?? undefined };
+      }
+      if (!sync || !resp.ok) return null;
+      return { costUsd: cloroCreditsToUsd(sync.credits), model: sync.model };
+    },
+  },
+  {
+    name: "fal",
+    match: (u) => u.includes("fal.run"),
+    extract: async (resp) => {
+      if (!resp.ok) return null;
+      const j: any = await resp.clone().json().catch(() => null);
+      const images = Array.isArray(j?.images) && j.images.length > 0 ? j.images.length : 1;
+      let model: string | null = null;
+      try {
+        model = new URL(resp.url).pathname.replace(/^\//, "") || null;
+      } catch {
+        /* */
+      }
+      return {
+        costUsd: Math.round(images * FAL_IMAGE_USD * 1_000_000) / 1_000_000,
+        model: model ?? undefined,
+      };
     },
   },
   {

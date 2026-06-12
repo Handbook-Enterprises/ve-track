@@ -9,8 +9,10 @@ export {
   withUser,
   withAction,
   getCurrentScope,
+  trackUsage,
 } from "./hook";
-export { PROVIDERS } from "./providers";
+export type { TrackUsageInput } from "./hook";
+export { PROVIDERS, cloroCreditsToUsd } from "./providers";
 export type {
   TrackedHandlerConfig,
   UserResolver,
