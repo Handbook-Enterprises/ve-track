@@ -201,6 +201,11 @@ export const PROVIDERS: Provider[] = [
     name: "cloro",
     match: (u) => u.includes("api.cloro.dev"),
     extract: async (resp) => {
+      try {
+        if (/\/async\/task\/?$/i.test(new URL(resp.url).pathname)) return null;
+      } catch {
+        /* */
+      }
       const j: any = await resp.clone().json().catch(() => null);
       const credits = j?.credits?.creditsCharged ?? j?.credits?.creditsToCharge;
       const taskType = j?.task?.taskType ?? j?.result?.taskType;
