@@ -67,7 +67,7 @@ const computeCost = (
   return Math.round(cost * 1_000_000) / 1_000_000;
 };
 
-const CLORO_USD_PER_CREDIT = 0.0004;
+const CLORO_USD_PER_CREDIT = 0.04;
 const FAL_IMAGE_USD = 0.01;
 
 export const cloroCreditsToUsd = (credits: number): number =>
