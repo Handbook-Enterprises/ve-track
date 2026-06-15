@@ -12,16 +12,17 @@ Cost-attribution SDK + service for AI-shaped apps. One install, one wrapper line
 ## Table of contents
 
 1. [60-second quick start](#60-second-quick-start)
-2. [The five-method API](#the-five-method-api)
+2. [The core API](#the-core-api)
 3. [Patterns by worker shape](#patterns-by-worker-shape)
 4. [Tagging your work with actions](#tagging-your-work-with-actions)
-5. [Configuration](#configuration)
-6. [Providers + what gets captured](#providers--what-gets-captured)
-7. [How users + orgs are identified](#how-users--orgs-are-identified)
-8. [Dashboard concepts](#dashboard-concepts)
-9. [Architecture](#architecture)
-10. [Self-host the service](#self-host-the-service)
-11. [Local development](#local-development)
+5. [Manual events](#manual-events)
+6. [Configuration](#configuration)
+7. [Providers + what gets captured](#providers--what-gets-captured)
+8. [How users + orgs are identified](#how-users--orgs-are-identified)
+9. [Dashboard concepts](#dashboard-concepts)
+10. [Architecture](#architecture)
+11. [Self-host the service](#self-host-the-service)
+12. [Local development](#local-development)
 
 ---
 
@@ -61,13 +62,13 @@ export default trackHandler<Env>(
 );
 ```
 
-That's it. Every external provider fetch your worker makes (OpenAI, Anthropic, Gemini, OpenRouter, Zyte, DataForSEO, Apify, Firecrawl, BrightData, …) is now intercepted, priced, attributed to the signed-in Clerk user/org, and shipped to your dashboard.
+That's it. Every external provider fetch your worker makes (OpenAI, Anthropic, Gemini, OpenRouter, Perplexity, Cloro, Fal, Zyte, DataForSEO, Apify, Firecrawl, BrightData, …) is now intercepted, priced, attributed to the signed-in Clerk user/org, and shipped to your dashboard.
 
 > Don't have a Clerk app? Pass `resolveUser: "none"` to disable user attribution.
 
 ---
 
-## The five-method API
+## The core API
 
 All you ever need to import:
 
@@ -76,10 +77,11 @@ All you ever need to import:
 | `trackHandler(config, handler)` | Wraps your `ExportedHandler` (`fetch` / `queue` / `scheduled` / `email`) so every internal provider fetch becomes a tracked event. **The only required call.** |
 | `trackMessage(message, fn)` | Inside a queue handler, scopes a single message under its body's `auth` + `action`. Reads `body.auth.userId`, `body.auth.orgId`, `body.action` automatically. |
 | `trackAction(label, fn)` | Tags an arbitrary block of work with an action label. Useful when one HTTP request runs multiple distinct actions. |
+| `trackUsage(usage)` | Manually emit one event from inside a scope. The escape hatch for a provider the lib doesn't auto-detect, or a cost you compute yourself. See [Manual events](#manual-events). |
 | `withUser({ userId, orgId }, fn)` | Override user/org for a block. Rare. |
 | `getCurrentScope()` | Inspect what's currently being tracked. Debugging-only. |
 
-Power users can also pull `trackedHandler`, `runScope`, `RequestScope`, and the raw `PROVIDERS` table — but you almost certainly don't need those.
+Power users can also pull `trackedHandler`, `runScope`, `installFetchHook`, `clerkUserResolver`, `RequestScope`, the raw `PROVIDERS` table, and the `cloroCreditsToUsd` helper — but you almost certainly don't need those.
 
 ---
 
@@ -187,6 +189,33 @@ You can mix them: a `trackMessage(...)` inside a queue handler can contain a `tr
 
 ---
 
+## Manual events
+
+Auto-interception covers every provider in the table below. When you hit something the lib doesn't recognize, or you already know the cost and want to record it yourself, call `trackUsage` from inside any tracked scope:
+
+```ts
+import { trackUsage } from "@viewengine/track";
+
+const res = await fetch("https://api.some-new-provider.com/run", { ... });
+const body = await res.json();
+
+trackUsage({
+  provider: "some-new-provider",
+  costUsd: body.cost,
+  model: body.model,
+  promptTokens: body.usage?.input,
+  completionTokens: body.usage?.output,
+  latencyMs: 142,
+  statusCode: res.status,
+});
+```
+
+It inherits the current scope's `app`, user, org, and `action` — override any of them per call (`action`, `userId`, `orgId`). The event joins the same per-request buffer and flushes with everything else. Outside a scope it's a silent no-op, so it's safe to leave in.
+
+When the provider is one you'll hit repeatedly, prefer adding it to `src/providers.ts` (one entry, see [Providers](#providers--what-gets-captured)) so it's captured automatically everywhere instead of by hand at each call site.
+
+---
+
 ## Configuration
 
 `trackHandler<E>(config, handler)` — `config` accepts:
@@ -225,6 +254,9 @@ Built-in matchers and how cost is computed (model-table → token math, fallback
 | Anthropic | `api.anthropic.com` | same — claude-opus-4, claude-sonnet-4-x, claude-haiku-4-5, claude-3-* |
 | Google Gemini | `generativelanguage.googleapis.com`, `aiplatform.googleapis.com` | same — gemini-2.5-pro/flash/flash-lite, gemini-1.5-* |
 | OpenRouter | `openrouter.ai/api` | uses OpenRouter's `usage.cost` if present, falls back to model table |
+| Perplexity | `api.perplexity.ai` | `usage.cost.total_cost` if present, else model table (sonar, sonar-pro, sonar-reasoning, sonar-deep-research) |
+| Cloro | `api.cloro.dev` | `credits.creditsCharged` → USD at $0.04/credit; flat credit cost for sync monitor endpoints; async submit acks skipped |
+| Fal | `fal.run` | $0.01 per returned image; model = endpoint path |
 | Zyte | `api.zyte.com` | `Zyte-Request-Cost` header, then body, then $0.001 floor |
 | DataForSEO | `api.dataforseo.com` | `tasks[0].cost` field |
 | Apify | `api.apify.com` | `data.usageTotalUsd` |
