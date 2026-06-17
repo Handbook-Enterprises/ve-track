@@ -10,6 +10,7 @@ import type {
   UsageEventInput,
   UsageGroup,
   UsageQuery,
+  UsageSeriesPoint,
   UsageTotals,
 } from "../interfaces/usage-event.interface";
 
@@ -42,6 +43,7 @@ const computeMargin = (revenue: number, cost: number) => {
 };
 
 const DEFAULT_FROM_DAYS = 7;
+const DAY_MS = 86_400_000;
 
 const parseFromDays = (raw?: string): number => {
   const parsed = parseInt(raw ?? `${DEFAULT_FROM_DAYS}`, 10);
@@ -49,13 +51,31 @@ const parseFromDays = (raw?: string): number => {
   return Math.min(parsed, 365);
 };
 
+interface UsageWindow {
+  fromTs: number;
+  toTs?: number;
+  fromDays: number;
+}
+
+const resolveWindow = (query: UsageQuery): UsageWindow => {
+  const from = query.from != null ? parseInt(query.from, 10) : NaN;
+  const to = query.to != null ? parseInt(query.to, 10) : NaN;
+  if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+    const fromDays = Math.max(1, Math.round((to - from) / DAY_MS));
+    return { fromTs: from, toTs: to, fromDays };
+  }
+  const fromDays = parseFromDays(query.fromDays);
+  return { fromTs: UsageEventRepository.fromDaysToTs(fromDays), fromDays };
+};
+
 const baseFilters = (
   tenantId: string,
   query: UsageQuery,
-  fromDays: number,
+  window: UsageWindow,
 ) => ({
   tenant_id: tenantId,
-  fromTs: UsageEventRepository.fromDaysToTs(fromDays),
+  fromTs: window.fromTs,
+  toTs: window.toTs,
   app: query.app || undefined,
   provider: query.provider || undefined,
   clerk_org_id: query.clerk_org_id || undefined,
@@ -121,13 +141,13 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "app",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
   }
 
   static async getByOrg(
@@ -135,13 +155,13 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "clerk_org_id",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
   }
 
   static async getByUser(
@@ -149,13 +169,13 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "clerk_user_id",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
   }
 
   static async getByProvider(
@@ -163,13 +183,13 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "provider",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
   }
 
   static async getByModel(
@@ -177,13 +197,13 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "model",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
   }
 
   static async getByAction(
@@ -191,13 +211,31 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "action",
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
-    return this.respond(groups, fromDays);
+    return this.respond(groups, window.fromDays);
+
+  }
+
+  static async getSeries(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query: UsageQuery,
+  ): Promise<UsageSeriesPoint[]> {
+    const window = resolveWindow(query);
+    const rows = await UsageEventRepository.dailySeries(
+      db,
+      baseFilters(tenantId, query, window),
+    );
+    return rows.map((r) => ({
+      day: r.day,
+      cost_usd: Number(r.cost_usd ?? 0),
+      requests: Number(r.requests ?? 0),
+    }));
   }
 
   static async getTotals(
@@ -205,8 +243,9 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
-    const filters = baseFilters(tenantId, query, fromDays);
+    const window = resolveWindow(query);
+    const fromDays = window.fromDays;
+    const filters = baseFilters(tenantId, query, window);
     const [totals, prev] = await Promise.all([
       UsageEventRepository.totals(db, filters),
       UsageEventRepository.previousTotals(db, filters, fromDays),
@@ -241,11 +280,12 @@ class UsageEventService {
     query: UsageQuery,
   ) {
     const dim = resolveProfitabilityDim(by);
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
+    const fromDays = window.fromDays;
     const rows = await UsageEventRepository.profitabilityGroupBy(
       db,
       dim,
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
     const groups: ProfitabilityGroup[] = rows.map((r) => {
       const revenue = Number(r.revenue_usd ?? 0);
@@ -289,10 +329,11 @@ class UsageEventService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const fromDays = parseFromDays(query.fromDays);
+    const window = resolveWindow(query);
+    const fromDays = window.fromDays;
     const row = await UsageEventRepository.profitabilityTotals(
       db,
-      baseFilters(tenantId, query, fromDays),
+      baseFilters(tenantId, query, window),
     );
     const revenue = Number(row.revenue_usd ?? 0);
     const cost = Number(row.cost_usd ?? 0);
