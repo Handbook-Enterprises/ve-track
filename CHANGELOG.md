@@ -22,9 +22,10 @@ Every event now carries:
 - **Cached and reasoning tokens** are captured and priced separately (a major prior source of undercounting): OpenAI `cached_tokens` / `reasoning_tokens`, Anthropic `cache_read` / `cache_creation`, Gemini `cachedContentTokenCount` / `thoughtsTokenCount`.
 - **Streamed responses are captured** instead of dropped. For OpenAI-compatible providers the SDK sets `stream_options.include_usage`; Anthropic stream usage is summed across `message_start` / `message_delta`.
 
-### Overview dashboard redesign
+### Dashboard redesign
 
-The Overview page is now: total spend for any period (preset windows or a custom date range), provider count, most expensive provider, a spend-over-time chart, and the top 5 providers by spend.
+- **Overview** is now: total spend for any period (preset windows or a custom date range), provider count, most expensive provider, a spend-over-time chart, and the top 5 providers by spend.
+- **Usage** is now provider-based: a single sortable, searchable data table of usage logs (spend, share, calls, tokens, avg/call), driven by the same date-range selector. This sets up per-provider "Connected accounts" (see [docs/cost-connectors.md](./docs/cost-connectors.md)). The old action-centric ledger and stat cards were removed.
 
 ### Compatibility
 
@@ -80,7 +81,7 @@ Key invariants:
 The dashboard at `/dashboard` has three pages:
 
 - **Overview** — total spend for any period (presets or a custom date range), provider count, most expensive provider, a spend-over-time chart, and the top 5 providers.
-- **Usage** — full attribution. Switch dimension between By Action (default), App, Organization, Person, Provider, Model. Powered by TanStack Table — sortable, filterable. The By Action callout (`action · $0.014 avg/run · 12 runs · 38% of spend`) is what you base credit prices on.
+- **Usage** — usage logs: a sortable, searchable data table (spend, share, calls, tokens, avg/call) over the selected period. The surface where connected provider accounts will surface their pulled actuals.
 - **Keys** — issue, rotate, revoke API keys.
 
 The dashboard resolves Clerk user/org IDs to names via `@clerk/backend` server-side, so the UI shows `Sylvester · sylvester@viewengine.ai` instead of `user_3C5DLG5R…`.

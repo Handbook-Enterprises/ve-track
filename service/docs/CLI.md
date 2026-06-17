@@ -14,9 +14,9 @@ bun cli/ve-track.ts --help
 
 Mint a key in the VE Track dashboard (Keys page), then pass it via env or flag:
 
-| Env var | Flag | Purpose |
-|---------|------|---------|
-| `VE_TRACK_KEY` | `--key` | Tenant API key (sent as `x-ve-key`) |
+| Env var            | Flag    | Purpose                                              |
+| ------------------ | ------- | ---------------------------------------------------- |
+| `VE_TRACK_KEY`     | `--key` | Tenant API key (sent as `x-ve-key`)                  |
 | `VE_TRACK_API_URL` | `--url` | API base URL (default `https://track.viewengine.ai`) |
 
 ```bash
@@ -53,7 +53,7 @@ ve-track status          # public, no key required
 ## Recipes
 
 ```bash
-# This month's spend by provider, sorted
+# This month's usage logs, sorted
 ve-track usage by-provider --from-days 30 | jq '.groups // . | sort_by(-.cost_usd)'
 
 # Margin by app
