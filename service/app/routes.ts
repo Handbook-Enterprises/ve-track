@@ -11,6 +11,7 @@ export default [
   route("sign-in", "routes/sign-in.tsx"),
   route("sign-up", "routes/sign-up.tsx"),
   route("sso-callback", "routes/sso-callback.tsx"),
+  route("docs", "routes/docs.tsx"),
 
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/overview.tsx", { id: "dashboard-overview" }),
