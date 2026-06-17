@@ -1,4 +1,5 @@
 import type { Provider } from "./types";
+import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse";
 
 interface ModelPrice {
   inputPerM: number;
@@ -80,6 +81,92 @@ const CLORO_SYNC_ENDPOINTS: Array<{ match: RegExp; credits: number; model: strin
   { match: /\/monitor\/aimode/i, credits: 6, model: "aimode" },
 ];
 
+const enableStreamUsage = (init: RequestInit): void => {
+  if (typeof init.body !== "string") return;
+  try {
+    const body = JSON.parse(init.body);
+    if (body?.stream !== true) return;
+    body.stream_options = { ...(body.stream_options ?? {}), include_usage: true };
+    init.body = JSON.stringify(body);
+  } catch {
+    /* */
+  }
+};
+
+const readOpenAiUsage = async (
+  resp: Response,
+): Promise<{ usage: any; model: string | null } | null> => {
+  if (isEventStream(resp)) {
+    const chunks = parseSseData(await resp.text().catch(() => ""));
+    const hit = readStreamUsageChunk(chunks);
+    if (!hit) return null;
+    return { usage: hit.usage, model: hit.model ?? chunks[0]?.model ?? null };
+  }
+  const j: any = await resp.clone().json().catch(() => null);
+  if (!j?.usage) return null;
+  return { usage: j.usage, model: j.model ?? null };
+};
+
+const splitCachedInput = (usage: any): { prompt: number; cached: number } => {
+  const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
+  const total = usage.prompt_tokens ?? usage.input_tokens ?? 0;
+  return { prompt: Math.max(0, total - cached), cached };
+};
+
+const readGeminiUsage = async (resp: Response): Promise<any | null> => {
+  if (isEventStream(resp)) {
+    const chunks = parseSseData(await resp.text().catch(() => ""));
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const u = chunks[i]?.usageMetadata ?? chunks[i]?.usage_metadata;
+      if (u) return { usage: u, model: chunks[i]?.modelVersion ?? chunks[i]?.model ?? null };
+    }
+    return null;
+  }
+  const j: any = await resp.clone().json().catch(() => null);
+  if (!j) return null;
+  const usage = j.usageMetadata ?? j.usage_metadata ?? j.usage;
+  if (!usage) return null;
+  return { usage, model: j.modelVersion ?? j.model ?? j.model_version ?? null };
+};
+
+const readAnthropicUsage = async (
+  resp: Response,
+): Promise<{ usage: any; model: string | null } | null> => {
+  if (isEventStream(resp)) {
+    const chunks = parseSseData(await resp.text().catch(() => ""));
+    let model: string | null = null;
+    let input = 0;
+    let cacheRead = 0;
+    let cacheWrite = 0;
+    let output = 0;
+    for (const ch of chunks) {
+      if (ch?.type === "message_start" && ch.message) {
+        model = ch.message.model ?? model;
+        const mu = ch.message.usage ?? {};
+        input = mu.input_tokens ?? input;
+        cacheRead = mu.cache_read_input_tokens ?? cacheRead;
+        cacheWrite = mu.cache_creation_input_tokens ?? cacheWrite;
+        output = mu.output_tokens ?? output;
+      } else if (ch?.type === "message_delta" && ch.usage) {
+        output = ch.usage.output_tokens ?? output;
+      }
+    }
+    if (!model && input === 0 && output === 0) return null;
+    return {
+      model,
+      usage: {
+        input_tokens: input,
+        cache_read_input_tokens: cacheRead,
+        cache_creation_input_tokens: cacheWrite,
+        output_tokens: output,
+      },
+    };
+  }
+  const j: any = await resp.clone().json().catch(() => null);
+  if (!j?.usage) return null;
+  return { usage: j.usage, model: j.model ?? null };
+};
+
 export const PROVIDERS: Provider[] = [
   {
     name: "openrouter",
@@ -98,16 +185,23 @@ export const PROVIDERS: Provider[] = [
           /* */
         }
       }
+      enableStreamUsage(init);
     },
     extract: async (resp) => {
-      if (resp.headers.get("content-type")?.includes("event-stream")) return null;
-      const j: any = await resp.clone().json().catch(() => null);
-      if (!j?.usage) return null;
-      const promptTokens = j.usage.prompt_tokens;
-      const completionTokens = j.usage.completion_tokens;
-      const explicit = typeof j.usage.cost === "number" ? j.usage.cost : null;
-      const costUsd = explicit ?? computeCost(j.model, promptTokens, completionTokens);
-      return { costUsd, model: j.model, promptTokens, completionTokens };
+      const payload = await readOpenAiUsage(resp);
+      if (!payload) return null;
+      const { usage, model } = payload;
+      const { prompt, cached } = splitCachedInput(usage);
+      const completionTokens = usage.completion_tokens ?? 0;
+      const explicit = typeof usage.cost === "number" ? usage.cost : null;
+      const costUsd = explicit ?? computeCost(model, prompt + cached, completionTokens);
+      return {
+        costUsd,
+        model: model ?? undefined,
+        promptTokens: prompt,
+        completionTokens,
+        cachedInputTokens: cached,
+      };
     },
   },
   {
@@ -124,14 +218,24 @@ export const PROVIDERS: Provider[] = [
           /* */
         }
       }
+      enableStreamUsage(init);
     },
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
-      if (!j?.usage) return null;
-      const promptTokens = j.usage.prompt_tokens ?? j.usage.input_tokens;
-      const completionTokens = j.usage.completion_tokens ?? j.usage.output_tokens;
-      const costUsd = computeCost(j.model, promptTokens, completionTokens);
-      return { costUsd, model: j.model, promptTokens, completionTokens };
+      const payload = await readOpenAiUsage(resp);
+      if (!payload) return null;
+      const { usage, model } = payload;
+      const { prompt, cached } = splitCachedInput(usage);
+      const completionTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
+      const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? 0;
+      const costUsd = computeCost(model, prompt + cached, completionTokens);
+      return {
+        costUsd,
+        model: model ?? undefined,
+        promptTokens: prompt,
+        completionTokens,
+        cachedInputTokens: cached,
+        reasoningTokens: reasoning,
+      };
     },
   },
   {
@@ -151,12 +255,26 @@ export const PROVIDERS: Provider[] = [
       }
     },
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
-      if (!j?.usage) return null;
-      const promptTokens = j.usage.input_tokens;
-      const completionTokens = j.usage.output_tokens;
-      const costUsd = computeCost(j.model, promptTokens, completionTokens);
-      return { costUsd, model: j.model, promptTokens, completionTokens };
+      const payload = await readAnthropicUsage(resp);
+      if (!payload) return null;
+      const { usage, model } = payload;
+      const promptTokens = usage.input_tokens ?? 0;
+      const cached = usage.cache_read_input_tokens ?? 0;
+      const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+      const completionTokens = usage.output_tokens ?? 0;
+      const costUsd = computeCost(
+        model,
+        promptTokens + cached + cacheWrite,
+        completionTokens,
+      );
+      return {
+        costUsd,
+        model: model ?? undefined,
+        promptTokens,
+        completionTokens,
+        cachedInputTokens: cached,
+        cacheWriteTokens: cacheWrite,
+      };
     },
   },
   {
@@ -165,36 +283,55 @@ export const PROVIDERS: Provider[] = [
       u.includes("generativelanguage.googleapis.com") ||
       u.includes("aiplatform.googleapis.com"),
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
-      if (!j) return null;
-      const usage = j.usageMetadata ?? j.usage_metadata ?? j.usage;
-      if (!usage) return null;
-      const promptTokens = usage.promptTokenCount ?? usage.prompt_token_count ?? usage.promptTokens;
+      const payload = await readGeminiUsage(resp);
+      if (!payload) return null;
+      const { usage, model } = payload;
+      const totalPrompt =
+        usage.promptTokenCount ?? usage.prompt_token_count ?? usage.promptTokens ?? 0;
+      const cached =
+        usage.cachedContentTokenCount ?? usage.cached_content_token_count ?? 0;
       const completionTokens =
         usage.candidatesTokenCount ??
         usage.candidates_token_count ??
         usage.completionTokens ??
-        usage.outputTokenCount;
-      const model = j.modelVersion ?? j.model ?? j.model_version ?? null;
-      const costUsd = computeCost(model, promptTokens, completionTokens);
-      return { costUsd, model, promptTokens, completionTokens };
+        usage.outputTokenCount ??
+        0;
+      const reasoning = usage.thoughtsTokenCount ?? usage.thoughts_token_count ?? 0;
+      const costUsd = computeCost(model, totalPrompt, completionTokens);
+      return {
+        costUsd,
+        model: model ?? undefined,
+        promptTokens: Math.max(0, totalPrompt - cached),
+        completionTokens,
+        cachedInputTokens: cached,
+        reasoningTokens: reasoning,
+      };
     },
   },
   {
     name: "perplexity",
     match: (u) => u.includes("api.perplexity.ai"),
+    enhance: (init) => {
+      enableStreamUsage(init);
+    },
     extract: async (resp) => {
-      if (resp.headers.get("content-type")?.includes("event-stream")) return null;
-      const j: any = await resp.clone().json().catch(() => null);
-      if (!j?.usage) return null;
-      const promptTokens = j.usage.prompt_tokens;
-      const completionTokens = j.usage.completion_tokens;
-      const explicit = j.usage.cost?.total_cost;
+      const payload = await readOpenAiUsage(resp);
+      if (!payload) return null;
+      const { usage, model } = payload;
+      const { prompt, cached } = splitCachedInput(usage);
+      const completionTokens = usage.completion_tokens ?? 0;
+      const explicit = usage.cost?.total_cost;
       const costUsd =
         typeof explicit === "number"
           ? explicit
-          : computeCost(j.model, promptTokens, completionTokens);
-      return { costUsd, model: j.model, promptTokens, completionTokens };
+          : computeCost(model, prompt + cached, completionTokens);
+      return {
+        costUsd,
+        model: model ?? undefined,
+        promptTokens: prompt,
+        completionTokens,
+        cachedInputTokens: cached,
+      };
     },
   },
   {

@@ -8,6 +8,9 @@ export interface UsageEventInput {
   model: string | null;
   prompt_tokens: number | null;
   completion_tokens: number | null;
+  cached_input_tokens?: number | null;
+  cache_write_tokens?: number | null;
+  reasoning_tokens?: number | null;
   latency_ms: number | null;
   cost_usd: number | null;
   status_code: number | null;

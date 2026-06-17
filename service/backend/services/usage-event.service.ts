@@ -1,5 +1,6 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { UsageEventRepository } from "../repositories/usage-event.repository";
+import PricingService, { REPRICE_PROVIDERS } from "./pricing.service";
 import { UsageEventMessages } from "../messages/usage-event.messages";
 import { CustomError } from "../utils";
 import { HTTP_STATUS_CODES } from "../constants";
@@ -107,25 +108,58 @@ class UsageEventService {
 
     const valid = body.events.filter(validateEvent);
     console.log("[ve-track][ingest-svc] valid events", { received: body.events.length, valid: valid.length });
-    const rows = valid.map((e) => ({
-      id: e.id,
-      tenant_id: tenantId,
-      timestamp: e.timestamp,
-      app: body.app,
-      clerk_user_id: e.clerk_user_id ?? null,
-      clerk_org_id: e.clerk_org_id ?? null,
-      action: e.action ?? null,
-      provider: e.provider,
-      model: e.model ?? null,
-      prompt_tokens: e.prompt_tokens ?? null,
-      completion_tokens: e.completion_tokens ?? null,
-      latency_ms: e.latency_ms ?? null,
-      cost_usd: e.cost_usd ?? null,
-      status_code: e.status_code ?? null,
-      credits_charged: e.credits_charged ?? null,
-      credit_price_usd_at_event: e.credit_price_usd_at_event ?? null,
-      correlation_id: e.correlation_id ?? null,
-    }));
+
+    const index = await PricingService.getIndex(db);
+
+    const rows = valid.map((e) => {
+      const cachedInput = e.cached_input_tokens ?? 0;
+      const cacheWrite = e.cache_write_tokens ?? 0;
+      let cost_usd = e.cost_usd ?? null;
+      let cost_source = "provider_response";
+      let cost_confidence = cost_usd != null ? "high" : "unknown";
+
+      if (REPRICE_PROVIDERS.has(e.provider)) {
+        const priced = PricingService.price(index, e.provider, e.model ?? null, {
+          prompt: e.prompt_tokens ?? 0,
+          cached: cachedInput,
+          cacheWrite,
+          completion: e.completion_tokens ?? 0,
+        });
+        if (priced.matched) {
+          cost_usd = priced.costUsd;
+          cost_source = "catalog";
+          cost_confidence = "high";
+        } else {
+          cost_source = "estimate";
+          cost_confidence = "unknown";
+        }
+      }
+
+      return {
+        id: e.id,
+        tenant_id: tenantId,
+        timestamp: e.timestamp,
+        app: body.app,
+        clerk_user_id: e.clerk_user_id ?? null,
+        clerk_org_id: e.clerk_org_id ?? null,
+        action: e.action ?? null,
+        provider: e.provider,
+        model: e.model ?? null,
+        prompt_tokens: e.prompt_tokens ?? null,
+        completion_tokens: e.completion_tokens ?? null,
+        cached_input_tokens: e.cached_input_tokens ?? null,
+        cache_write_tokens: e.cache_write_tokens ?? null,
+        reasoning_tokens: e.reasoning_tokens ?? null,
+        latency_ms: e.latency_ms ?? null,
+        cost_usd,
+        cost_source,
+        cost_confidence,
+        status_code: e.status_code ?? null,
+        credits_charged: e.credits_charged ?? null,
+        credit_price_usd_at_event: e.credit_price_usd_at_event ?? null,
+        correlation_id: e.correlation_id ?? null,
+      };
+    });
 
     const inserted = await UsageEventRepository.insertMany(db, rows);
     return {

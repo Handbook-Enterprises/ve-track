@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/cloudflare";
+import { drizzle } from "drizzle-orm/d1";
 import { createRequestHandler } from "react-router";
 import honoApi from "../backend";
+import PricingService from "../backend/services/pricing.service";
 import { SENTRY_DSN } from "~/lib/sentry";
 
 declare module "react-router" {
@@ -28,6 +30,9 @@ const handler = {
     return requestHandler(request, {
       cloudflare: { env, ctx },
     });
+  },
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(PricingService.syncIfStale(drizzle(env.DB)));
   },
 } satisfies ExportedHandler<Env>;
 
