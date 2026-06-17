@@ -26,6 +26,12 @@ export interface UsageTotals {
   delta?: UsageDelta;
 }
 
+export interface UsageSeriesPoint {
+  day: string;
+  cost_usd: number;
+  requests: number;
+}
+
 export interface UsageOverview {
   fromDays: number;
   totals: UsageTotals;
@@ -35,10 +41,13 @@ export interface UsageOverview {
   byProvider: UsageGroup[];
   byModel: UsageGroup[];
   byAction: UsageGroup[];
+  series: UsageSeriesPoint[];
 }
 
 export interface UsageQueryFilters {
   fromDays?: number;
+  from?: number;
+  to?: number;
   app?: string;
   provider?: string;
   clerk_org_id?: string;

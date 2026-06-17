@@ -20,6 +20,7 @@ const EMPTY_OVERVIEW: UsageOverview = {
   byProvider: [],
   byModel: [],
   byAction: [],
+  series: [],
 };
 
 export function useUsage(initial?: UsageQueryFilters) {

@@ -7,6 +7,7 @@ const dayMs = 86_400_000;
 interface BaseFilters {
   tenant_id: string;
   fromTs: number;
+  toTs?: number;
   app?: string;
   provider?: string;
   clerk_org_id?: string;
@@ -19,6 +20,8 @@ const buildWhere = (filters: BaseFilters) => {
     eq(UsageEvent.tenant_id, filters.tenant_id),
     gte(UsageEvent.timestamp, filters.fromTs),
   ];
+  if (filters.toTs != null)
+    conditions.push(sql`${UsageEvent.timestamp} < ${filters.toTs}`);
   if (filters.app) conditions.push(eq(UsageEvent.app, filters.app));
   if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
   if (filters.clerk_org_id)
@@ -90,6 +93,20 @@ class UsageEventRepository {
 
   static fromDaysToTs(fromDays: number): number {
     return Date.now() - fromDays * dayMs;
+  }
+
+  static async dailySeries(db: DrizzleD1Database, filters: BaseFilters) {
+    const day = sql<string>`strftime('%Y-%m-%d', ${UsageEvent.timestamp} / 1000, 'unixepoch')`;
+    return db
+      .select({
+        day,
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(buildWhere(filters))
+      .groupBy(day)
+      .orderBy(day);
   }
 
   static async crossTenantTotals(

@@ -10,6 +10,8 @@ type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
 const buildQuery = (filters?: UsageQueryFilters): string => {
   if (!filters) return "";
   const params = new URLSearchParams();
+  if (filters.from != null) params.set("from", String(filters.from));
+  if (filters.to != null) params.set("to", String(filters.to));
   if (filters.fromDays != null) params.set("fromDays", String(filters.fromDays));
   if (filters.app) params.set("app", filters.app);
   if (filters.provider) params.set("provider", filters.provider);

@@ -41,7 +41,7 @@ class DashboardService {
     tenantId: string,
     query: UsageQuery,
   ) {
-    const [byApp, byOrg, byUser, byProvider, byModel, byAction, totals] =
+    const [byApp, byOrg, byUser, byProvider, byModel, byAction, totals, series] =
       await Promise.all([
         UsageEventService.getByApp(db, tenantId, query),
         UsageEventService.getByOrg(db, tenantId, query),
@@ -50,6 +50,7 @@ class DashboardService {
         UsageEventService.getByModel(db, tenantId, query),
         UsageEventService.getByAction(db, tenantId, query),
         UsageEventService.getTotals(db, tenantId, query),
+        UsageEventService.getSeries(db, tenantId, query),
       ]);
 
     const userIds = byUser.groups
@@ -92,6 +93,7 @@ class DashboardService {
         byProvider: byProvider.groups,
         byModel: byModel.groups,
         byAction: byAction.groups,
+        series,
       },
     };
   }

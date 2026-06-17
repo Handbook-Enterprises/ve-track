@@ -23,11 +23,19 @@ export interface IngestBody {
 
 export interface UsageQuery {
   fromDays?: string;
+  from?: string;
+  to?: string;
   app?: string;
   provider?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;
+}
+
+export interface UsageSeriesPoint {
+  day: string;
+  cost_usd: number;
+  requests: number;
 }
 
 export interface UsageGroup {
