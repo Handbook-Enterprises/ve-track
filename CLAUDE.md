@@ -19,7 +19,9 @@ NB: PLEASE DO NOT WRITE COMMENTS
 
 8. If it is an expo react native project and the feature you're about to implement can use an expo-made package, use it to make things easier.
 
-9. Make sure to cache when BRUTALLY and OBJECTIVELY neccessary and use other development techniques to help us SCALE with a large number of concurrent users.
+9. Make sure to cache as much as you can and use other development techniques to help us SCALE with a large number of concurrent users.
+
+10. Most Projects have been shipped to users already so keep that in mind when coding. Make sure sure to update Changlelogs and Developer Docs(If the project has one) when key Changes have been made. Make sure to alert the Developer incase there are any migrations or versioning that need to be made due to the new changes we've made to the projects that users are already on.
 
 With the Above in mind steps to take before writing code.
 
