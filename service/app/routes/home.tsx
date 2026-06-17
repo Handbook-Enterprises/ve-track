@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import SiteNav from "~/components/common/site-nav";
+import SiteFooter from "~/components/common/site-footer";
 import type { Route } from "./+types/home";
 
 export function meta(_args: Route.MetaArgs) {
@@ -74,73 +75,16 @@ const PRICING_TIERS = [
 ];
 
 export default function Home(_props: Route.ComponentProps) {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
     <main className="min-h-screen bg-black font-mono text-white antialiased">
-      <Nav scrolled={scrolled} />
+      <SiteNav />
 
       <Hero />
       <Metrics />
       <HowItWorks />
       <Pricing />
-      <Footer />
+      <SiteFooter />
     </main>
-  );
-}
-
-function Nav({ scrolled }: { scrolled: boolean }) {
-  return (
-    <nav
-      className={`fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b px-8 py-5 backdrop-blur-md transition-colors ${
-        scrolled
-          ? "border-white/10 bg-black/80"
-          : "border-transparent bg-transparent"
-      }`}
-    >
-      <Link to="/" className="flex items-center gap-3">
-        <div className="h-3 w-3 rounded-full bg-[#FF4D00]" />
-        <span className="font-display text-lg font-bold uppercase tracking-tight">
-          ve-track
-        </span>
-      </Link>
-      <div className="hidden items-center gap-10 md:flex">
-        {[
-          ["#how", "How it works"],
-          ["#providers", "Providers"],
-          ["#pricing", "Pricing"],
-        ].map(([href, label]) => (
-          <a
-            key={href}
-            href={href}
-            className="text-xs uppercase tracking-[0.18em] text-white/60 transition-colors hover:text-[#FF4D00]"
-          >
-            {label}
-          </a>
-        ))}
-      </div>
-      <div className="flex items-center gap-3">
-        <Link
-          to="/sign-in"
-          className="text-xs uppercase tracking-[0.18em] text-white/70 transition-colors hover:text-white"
-        >
-          Sign in
-        </Link>
-        <Link
-          to="/sign-up"
-          className="border border-white bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black transition-colors hover:border-[#FF4D00] hover:bg-[#FF4D00] hover:text-black"
-        >
-          Get started
-        </Link>
-      </div>
-    </nav>
   );
 }
 
@@ -358,37 +302,3 @@ function Pricing() {
   );
 }
 
-function Footer() {
-  return (
-    <footer className="px-6 py-16">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-12 border-t border-white/10 pt-12">
-        <div>
-          <h4 className="font-display text-xl font-bold uppercase tracking-tight">
-            ve-track
-          </h4>
-          <p className="mt-3 max-w-xs text-xs text-white/50">
-            The cost attribution layer for AI-shaped apps. Built by ViewEngine.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-8 text-xs uppercase tracking-[0.16em] text-white/50">
-          <a href="#how" className="hover:text-[#FF4D00]">
-            How it works
-          </a>
-          <a href="#providers" className="hover:text-[#FF4D00]">
-            Providers
-          </a>
-          <a href="#pricing" className="hover:text-[#FF4D00]">
-            Pricing
-          </a>
-          <Link to="/sign-in" className="hover:text-[#FF4D00]">
-            Sign in
-          </Link>
-        </div>
-      </div>
-      <div className="mx-auto mt-8 flex max-w-7xl items-center justify-between text-[11px] uppercase tracking-[0.16em] text-white/30">
-        <span>© 2026 ViewEngine Inc.</span>
-        <span>System online · scanning</span>
-      </div>
-    </footer>
-  );
-}
