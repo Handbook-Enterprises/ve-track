@@ -3,32 +3,14 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
+import { providerLabel as labelFor } from "~/utils/providers";
 import type { UsageGroup } from "~/types/usage.types";
 
 interface Props {
   providers: UsageGroup[];
   totalCost: number;
+  onSelect?: (provider: UsageGroup) => void;
 }
-
-const PROVIDER_LABELS: Record<string, string> = {
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  gemini: "Gemini",
-  perplexity: "Perplexity",
-  openrouter: "OpenRouter",
-  cloro: "Cloro",
-  fal: "Fal",
-  zyte: "Zyte",
-  dataforseo: "DataForSEO",
-  apify: "Apify",
-  firecrawl: "Firecrawl",
-  brightdata: "BrightData",
-};
-
-const labelFor = (key: string | null): string => {
-  if (!key) return "Unknown";
-  return PROVIDER_LABELS[key.toLowerCase()] ?? key.charAt(0).toUpperCase() + key.slice(1);
-};
 
 const formatShare = (cost: number, total: number): string => {
   if (total <= 0) return "—";
@@ -38,7 +20,7 @@ const formatShare = (cost: number, total: number): string => {
   return "<1%";
 };
 
-export default function ProviderTable({ providers, totalCost }: Props) {
+export default function ProviderTable({ providers, totalCost, onSelect }: Props) {
   const columns = useMemo<ColumnDef<UsageGroup>[]>(
     () => [
       {
@@ -160,6 +142,7 @@ export default function ProviderTable({ providers, totalCost }: Props) {
       showCount
       countNoun="providers"
       accentFirstRowWhenDesc
+      onRowClick={onSelect}
       getRowId={(row, idx) => `${row.key ?? "null"}-${idx}`}
       emptyMessage="No provider spend in this window yet."
       emptyFilteredMessage={(q) => `No providers match "${q}".`}
