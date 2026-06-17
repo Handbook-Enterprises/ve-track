@@ -56,6 +56,9 @@ export function installFetchHook(): void {
         model: usage?.model ?? null,
         prompt_tokens: usage?.promptTokens ?? null,
         completion_tokens: usage?.completionTokens ?? null,
+        cached_input_tokens: usage?.cachedInputTokens ?? null,
+        cache_write_tokens: usage?.cacheWriteTokens ?? null,
+        reasoning_tokens: usage?.reasoningTokens ?? null,
         latency_ms: latencyMs,
         cost_usd: usage?.costUsd ?? null,
         status_code: response.status,
@@ -121,6 +124,9 @@ export interface TrackUsageInput {
   model?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
+  cachedInputTokens?: number | null;
+  cacheWriteTokens?: number | null;
+  reasoningTokens?: number | null;
   latencyMs?: number | null;
   statusCode?: number | null;
   action?: string;
@@ -142,6 +148,9 @@ export function trackUsage(usage: TrackUsageInput): void {
     model: usage.model ?? null,
     prompt_tokens: usage.promptTokens ?? null,
     completion_tokens: usage.completionTokens ?? null,
+    cached_input_tokens: usage.cachedInputTokens ?? null,
+    cache_write_tokens: usage.cacheWriteTokens ?? null,
+    reasoning_tokens: usage.reasoningTokens ?? null,
     latency_ms: usage.latencyMs ?? null,
     cost_usd: usage.costUsd ?? null,
     status_code: usage.statusCode ?? null,

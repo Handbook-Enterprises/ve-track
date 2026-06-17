@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import UsageEventService from "../services/usage-event.service";
+import PricingService from "../services/pricing.service";
 import { manageAsyncOps } from "../utils";
 import { HTTP_STATUS_CODES } from "../constants";
 import type { Env, ApiKeyVariables } from "../types";
@@ -17,6 +18,7 @@ class UsageEventController {
       UsageEventService.ingest(db, tenantId, body),
     );
     if (error) throw error;
+    c.executionCtx.waitUntil(PricingService.syncIfStale(db));
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
 
