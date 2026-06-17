@@ -4,12 +4,14 @@ import { useUsage } from "~/hooks/useUsage";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 import DateRangePicker from "~/components/common/date-range-picker";
 import ProviderTable from "~/components/common/provider-table";
+import ProviderDetailSheet from "~/components/common/provider-detail-sheet";
 import {
   DEFAULT_PRESET_ID,
   buildPreset,
   type DateRange,
   type RangePresetId,
 } from "~/utils/date-range";
+import type { UsageGroup } from "~/types/usage.types";
 
 export default function UsagePage() {
   const [range, setRange] = useState<DateRange>(() =>
@@ -24,6 +26,9 @@ export default function UsagePage() {
     to: range.to,
   });
 
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const handleRangeChange = (
     next: DateRange,
     presetId: RangePresetId | null,
@@ -31,6 +36,11 @@ export default function UsagePage() {
     setRange(next);
     setActivePresetId(presetId);
     setFilters({ from: next.from, to: next.to });
+  };
+
+  const handleSelectProvider = (provider: UsageGroup) => {
+    setSelectedProvider(provider.key);
+    setSheetOpen(true);
   };
 
   const providers = useMemo(
@@ -95,6 +105,18 @@ export default function UsagePage() {
       <ProviderTable
         providers={providers}
         totalCost={overview.totals.cost_usd}
+        onSelect={handleSelectProvider}
+      />
+      <p className="text-[11px] text-muted-foreground">
+        Click a provider to see its spend over time and the breakdown by model, action, app, person, and organization.
+      </p>
+
+      <ProviderDetailSheet
+        provider={selectedProvider}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        initialRange={range}
+        initialPresetId={activePresetId}
       />
     </div>
   );

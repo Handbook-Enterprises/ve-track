@@ -26,6 +26,7 @@ Every event now carries:
 
 - **Overview** is now: total spend for any period (preset windows or a custom date range), provider count, most expensive provider, a spend-over-time chart, and the top 5 providers by spend.
 - **Usage** is now provider-based: a single sortable, searchable data table of usage logs (spend, share, calls, tokens, avg/call), driven by the same date-range selector. This sets up per-provider "Connected accounts" (see [docs/cost-connectors.md](./docs/cost-connectors.md)). The old action-centric ledger and stat cards were removed.
+- **Provider detail sheet**: clicking a provider row opens a sheet with its own period selector (presets + custom) driving a spend-over-time chart and tabs that break the provider down by model, action, app, person, and organization, all re-querying as the period changes.
 
 ### Compatibility
 
