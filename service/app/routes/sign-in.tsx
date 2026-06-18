@@ -25,10 +25,10 @@ export default function SignInPage() {
           </p>
         </div>
         <SignIn
-          routing="path"
-          path="/sign-in"
+          routing="virtual"
           signUpUrl="/sign-up"
           fallbackRedirectUrl="/dashboard"
+          forceRedirectUrl="/dashboard"
         />
       </div>
     </main>
