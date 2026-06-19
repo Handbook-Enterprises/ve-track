@@ -48,6 +48,52 @@ class UsageEventRepository {
     return rows.length;
   }
 
+  static async upsertBilling(
+    db: DrizzleD1Database,
+    rows: (typeof UsageEvent.$inferInsert)[],
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
+    const stmts = rows.map((r) =>
+      db
+        .insert(UsageEvent)
+        .values(r)
+        .onConflictDoUpdate({
+          target: UsageEvent.id,
+          set: {
+            timestamp: r.timestamp,
+            app: r.app,
+            provider: r.provider,
+            model: r.model,
+            cost_usd: r.cost_usd,
+            cost_source: r.cost_source,
+            cost_confidence: r.cost_confidence,
+          },
+        }),
+    );
+    await db.batch(stmts as any);
+    return rows.length;
+  }
+
+  static async sumBillingByCorrelation(
+    db: DrizzleD1Database,
+    tenantId: string,
+    correlationId: string,
+  ): Promise<number> {
+    const [row] = await db
+      .select({
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+      })
+      .from(UsageEvent)
+      .where(
+        and(
+          eq(UsageEvent.tenant_id, tenantId),
+          eq(UsageEvent.correlation_id, correlationId),
+          eq(UsageEvent.cost_source, "provider_billing"),
+        ),
+      );
+    return Number(row?.cost_usd ?? 0);
+  }
+
   static async findById(db: DrizzleD1Database, id: string) {
     const [row] = await db
       .select()

@@ -2,8 +2,10 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService from "./usage-event.service";
+import CostTrackerService from "./cost-tracker.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
+import type { CostTrackerCreateBody } from "../interfaces/cost-tracker.interface";
 import type {
   UsageGroup,
   UsageQuery,
@@ -33,6 +35,31 @@ class DashboardService {
 
   static async revokeApiKey(db: DrizzleD1Database, id: string) {
     return ApiKeyService.revoke(db, id);
+  }
+
+  static async listTrackers(db: DrizzleD1Database, tenantId: string) {
+    return CostTrackerService.listForTenant(db, tenantId);
+  }
+
+  static async createTracker(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    body: CostTrackerCreateBody,
+  ) {
+    return CostTrackerService.create(db, env, tenantId, body);
+  }
+
+  static async disconnectTracker(
+    db: DrizzleD1Database,
+    tenantId: string,
+    id: string,
+  ) {
+    return CostTrackerService.disconnect(db, tenantId, id);
+  }
+
+  static async syncTracker(db: DrizzleD1Database, env: Env, id: string) {
+    return CostTrackerService.sync(db, env, id);
   }
 
   static async getOverview(

@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { createRequestHandler } from "react-router";
 import honoApi from "../backend";
 import PricingService from "../backend/services/pricing.service";
+import CostTrackerService from "../backend/services/cost-tracker.service";
 import { SENTRY_DSN } from "~/lib/sentry";
 
 declare module "react-router" {
@@ -32,7 +33,9 @@ const handler = {
     });
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(PricingService.syncIfStale(drizzle(env.DB)));
+    const db = drizzle(env.DB);
+    ctx.waitUntil(PricingService.syncIfStale(db));
+    ctx.waitUntil(CostTrackerService.syncAll(db, env));
   },
 } satisfies ExportedHandler<Env>;
 

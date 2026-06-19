@@ -1,6 +1,6 @@
 # Cost Connectors — connecting provider accounts for ground-truth cost
 
-Status: planning. Owner: Sylvester. Last updated: 2026-06-17.
+Status: Phase 0 + Phase 1 shipped. Owner: Sylvester. Last updated: 2026-06-18.
 
 This is the plan for tracking spend from people who use provider APIs **directly** (scripting, notebooks, non ve-app work) and never touch the `@viewengine/track` package. The package keeps doing per-request attribution for ve-apps; this adds a second, parallel path: **connect a provider account once, we pull the actual cost from the provider on a schedule.**
 
@@ -56,7 +56,18 @@ Legend: ✅ historical cost reachable · ⚠️ point-in-time only (balance/rema
 
 **Phase 0 — Simplify the Usage tab to be provider-based.** Ship first. Makes Provider the primary lens and creates the surface where "Connected accounts" slot in per provider. No key handling yet.
 
-**Phase 1 — OpenAI + Anthropic connect (admin key, pull).** Highest value, cleanest APIs, richest attribution. Build the connect flow, encrypted key storage, org-id dedup, daily pull, and the reconciliation rule end to end here — these two prove the whole pattern.
+**Phase 1 — OpenAI + Anthropic connect (admin key, pull). SHIPPED.** Surfaces as **Trackers** in the dashboard ("Add a tracker"). A tracker is a connected provider account: provider + a label + the app the spend attributes to + a pasted admin key. Highest value, cleanest APIs, richest attribution.
+
+How Phase 1 is built:
+
+- **Storage of pulled cost reuses `usage_events`.** Each daily cost line becomes a row tagged `cost_source = "provider_billing"`, `cost_confidence = "high"`, with `correlation_id = tracker.id` and a deterministic id (`cb_<trackerId>_<day>_<modelslug>_<hash>`) so re-pulls upsert instead of duplicating. This means the Overview page, the Usage provider table, and the Provider Detail Sheet light up with connected spend for free, with no query changes. Known tradeoff: the "Calls" metric counts daily cost-line rows, not real requests, for billing-sourced providers — dollars are exact, request counts are not (the cost endpoints do not return per-request counts).
+- **Tracker connections live in `cost_trackers`** (migration `0012_cost_trackers.sql`). Columns hold envelope-encrypted key material, `key_last4`, `dedup_hash`, `status`, `last_error`, `last_synced_at`, `pulled_cost_usd`.
+- **Encryption** (`backend/lib/connector-crypto.ts`): real envelope encryption with WebCrypto. A random per-record AES-256-GCM data key encrypts the API key; the data key is wrapped by a master key (KEK) read from the `CONNECTOR_ENC_KEY` secret. AAD is bound to `tenant_id`, so one tenant's ciphertext cannot be opened in another's context. The key is write-only (never returned to the client; only last 4 shown). Hardening path: move the KEK into Cloudflare Secrets Store and add per-tenant data keys without changing the record shape.
+- **Adapters** (`backend/lib/connectors/index.ts`): `validate(key)` and `pullDailyCosts(key, startMs)` per provider. OpenAI uses `/v1/organization/costs?group_by=line_item` (amounts in USD) and best-effort `/v1/me` for the org dedup id. Anthropic uses `/v1/organizations/cost_report?group_by[]=description` (amounts in **cents**, divided by 100) with `x-api-key` + `anthropic-version: 2023-06-01`; dedup is a hash of the org-scoped key.
+- **Pull cadence**: initial 30-day backfill on connect via `c.executionCtx.waitUntil`, then the existing hourly cron re-pulls a trailing 2-day window (capped at 60 days lookback) and upserts. Manual "Refresh now" per tracker is also exposed.
+- **Reconciliation**: provider-pulled rows are authoritative dollars. Phase 1 targets direct-API users who do not run the SDK, so there is no overlap yet; when an account also emits SDK events, the join key (provider + app) is where the "actuals win, SDK becomes attribution detail" rule will apply.
+
+Setup note for deploy: set the secret once with `wrangler secret put CONNECTOR_ENC_KEY` (base64 of 32 random bytes, e.g. `openssl rand -base64 32`) and add it to `.dev.vars` for local dev. Without it, the Trackers API returns a clear "not configured" error and the cron pull is skipped.
 
 **Phase 2 — Account-key pulls: OpenRouter, Fal, Apify, DataForSEO, Zyte.** Each has a usage/cost endpoint reachable by an account key; mostly the same pipeline with per-provider adapters.
 

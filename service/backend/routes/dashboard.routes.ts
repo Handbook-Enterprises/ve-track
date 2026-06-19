@@ -15,6 +15,10 @@ dashboardRouter.get("/me", DashboardController.meController);
 dashboardRouter.get("/keys", DashboardController.listKeysController);
 dashboardRouter.post("/keys", DashboardController.createKeyController);
 dashboardRouter.delete("/keys/:id", DashboardController.revokeKeyController);
+dashboardRouter.get("/trackers", DashboardController.listTrackersController);
+dashboardRouter.post("/trackers", DashboardController.createTrackerController);
+dashboardRouter.delete("/trackers/:id", DashboardController.disconnectTrackerController);
+dashboardRouter.post("/trackers/:id/sync", DashboardController.syncTrackerController);
 dashboardRouter.get("/overview", DashboardController.overviewController);
 dashboardRouter.post("/canary", DashboardController.canaryController);
 

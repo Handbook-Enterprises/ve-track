@@ -6,6 +6,7 @@ export type Env = {
   RESEND_FROM_EMAIL?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
+  CONNECTOR_ENC_KEY?: string;
 };
 
 export type ApiKeyVariables = {
