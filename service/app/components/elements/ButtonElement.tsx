@@ -10,7 +10,20 @@ type Props = React.ComponentProps<"button"> &
   };
 
 const ButtonElement = forwardRef<HTMLButtonElement, Props>(
-  ({ className, loading, disabled, children, ...rest }, ref) => {
+  ({ className, loading, disabled, children, asChild, ...rest }, ref) => {
+    if (asChild) {
+      return (
+        <Button
+          ref={ref}
+          asChild
+          disabled={disabled || loading}
+          className={cn(className)}
+          {...rest}
+        >
+          {children}
+        </Button>
+      );
+    }
     return (
       <Button
         ref={ref}

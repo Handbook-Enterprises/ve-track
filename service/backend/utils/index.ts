@@ -10,6 +10,14 @@ export const timestamps = {
     .default(sql`(current_timestamp)`),
 };
 
+export const slugify = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
 export const manageAsyncOps = async (fn: Promise<any>) => {
   try {
     const response = await fn;

@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import SiteNav from "~/components/common/site-nav";
 import SiteFooter from "~/components/common/site-footer";
 import CodeBlock from "~/components/common/code-block";
+import DocsCopyForLLM from "~/components/common/docs-copy-llm";
 import { useScrollSpy } from "~/hooks/useScrollSpy";
 import { PROVIDER_LABELS } from "~/utils/providers";
 import type { Route } from "./+types/docs";
@@ -127,6 +128,12 @@ export default function Docs(_props: Route.ComponentProps) {
           </aside>
 
           <article className="min-w-0 max-w-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5">
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/40">
+                Developer docs
+              </p>
+              <DocsCopyForLLM />
+            </div>
             <Section id="overview" index={0} title="Overview">
               <P>
                 ve-track is cost attribution for AI shaped apps. One install, one wrapper

@@ -1,11 +1,12 @@
 export type TrackerStatus = "active" | "error";
 
-export interface CostTracker {
+export type AddMethod = "integrate" | "manual";
+
+export interface Tracker {
   id: string;
   provider: string;
-  label: string;
-  app: string;
   key_last4: string;
+  account_ref: string | null;
   status: TrackerStatus;
   last_error: string | null;
   last_synced_at: number | null;
@@ -14,26 +15,56 @@ export interface CostTracker {
   updated_at: string;
 }
 
-export interface CostTrackerCreatePayload {
+export interface TrackerCreatePayload {
   provider: string;
-  label: string;
-  app: string;
   apiKey: string;
 }
 
-export interface CostTrackersListResponse {
-  success: boolean;
-  message: string;
-  trackers: CostTracker[];
+export interface ProviderGroup {
+  provider: string;
+  accounts: Tracker[];
+  totalCost: number;
+  distinctOrgs: number;
+  hasError: boolean;
 }
 
-export interface CostTrackerCreateResponse {
+export interface TrackersListResponse {
   success: boolean;
   message: string;
-  tracker: CostTracker;
+  trackers: Tracker[];
 }
 
-export interface CostTrackerActionResponse {
+export interface TrackerCreateResponse {
   success: boolean;
   message: string;
+  tracker: Tracker;
+}
+
+export interface TrackerActionResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface TrackerCostPoint {
+  day: string;
+  cost_usd: number;
+  requests: number;
+}
+
+export interface TrackerCostDetail {
+  series: TrackerCostPoint[];
+  totals: {
+    cost_usd: number;
+    requests: number;
+  };
+}
+
+export interface TrackerCostsResponse {
+  success: boolean;
+  detail: TrackerCostDetail;
+}
+
+export interface TrackerCostQuery {
+  from?: number;
+  to?: number;
 }

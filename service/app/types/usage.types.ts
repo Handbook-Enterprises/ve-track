@@ -53,6 +53,7 @@ export interface UsageQueryFilters {
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;
+  correlation_id?: string;
 }
 
 export interface UsageOverviewResponse {

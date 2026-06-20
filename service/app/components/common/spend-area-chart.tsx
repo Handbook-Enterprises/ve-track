@@ -43,9 +43,15 @@ interface Props {
   data: UsageSeriesPoint[];
   from: number;
   to: number;
+  emptyHint?: string | null;
 }
 
-export default function SpendAreaChart({ data, from, to }: Props) {
+export default function SpendAreaChart({
+  data,
+  from,
+  to,
+  emptyHint = "Wire an app's VE_TRACK_KEY and the meter starts here.",
+}: Props) {
   const series = useMemo(() => fillSeries(data, from, to), [data, from, to]);
   const hasSpend = useMemo(
     () => series.some((p) => p.cost_usd > 0),
@@ -56,9 +62,9 @@ export default function SpendAreaChart({ data, from, to }: Props) {
     return (
       <div className="flex h-[18rem] flex-col items-center justify-center gap-1.5 text-center">
         <p className="text-[13px] font-medium">No spend in this window.</p>
-        <p className="text-[12px] text-muted-foreground">
-          Wire an app's VE_TRACK_KEY and the meter starts here.
-        </p>
+        {emptyHint ? (
+          <p className="text-[12px] text-muted-foreground">{emptyHint}</p>
+        ) : null}
       </div>
     );
   }

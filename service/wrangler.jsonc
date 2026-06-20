@@ -23,7 +23,23 @@
       "dataset": "ve_usage_logs"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TRACKER_QUEUE",
+        "queue": "ve-track-tracker-sync"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "ve-track-tracker-sync",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_retries": 3
+      }
+    ]
+  },
   "triggers": {
-    "crons": ["0 * * * *"]
+    "crons": ["0 * * * *", "0 3 * * *"]
   }
 }

@@ -6,15 +6,22 @@ export interface DailyCost {
   costUsd: number;
 }
 
+export interface DailyRequests {
+  day: string;
+  requests: number;
+}
+
 export interface ValidateResult {
   ok: boolean;
   dedupId: string | null;
+  accountRef?: string | null;
   error?: string;
 }
 
 export interface ConnectorAdapter {
   validate(key: string): Promise<ValidateResult>;
   pullDailyCosts(key: string, startMs: number): Promise<DailyCost[]>;
+  pullDailyRequests?(key: string, startMs: number): Promise<DailyRequests[]>;
 }
 
 export const CONNECTOR_PROVIDERS = ["openai", "anthropic"] as const;
@@ -56,8 +63,10 @@ const openai: ConnectorAdapter = {
     } catch {
       dedupId = null;
     }
+    const accountRef =
+      dedupId && dedupId.startsWith("org") ? dedupId : null;
     if (!dedupId) dedupId = await sha256Hex(`openai:${key}`);
-    return { ok: true, dedupId };
+    return { ok: true, dedupId, accountRef };
   },
 
   async pullDailyCosts(key, startMs) {
@@ -76,7 +85,11 @@ const openai: ConnectorAdapter = {
         `https://api.openai.com/v1/organization/costs?${params.toString()}`,
         { headers: { Authorization: `Bearer ${key}` } },
       );
-      if (!res.ok) throw new Error(`OpenAI costs responded ${res.status}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("[ve-track][connectors] openai costs failed", res.status, body.slice(0, 300));
+        throw new Error(`OpenAI costs responded ${res.status}`);
+      }
       const data: any = await res.json();
       for (const bucket of data?.data ?? []) {
         const day = unixToDay(Number(bucket?.start_time ?? 0));
@@ -85,6 +98,40 @@ const openai: ConnectorAdapter = {
           if (!value) continue;
           out.push({ day, model: r?.line_item ?? "usage", costUsd: value });
         }
+      }
+      if (data?.has_more && data?.next_page) page = data.next_page;
+      else break;
+    }
+    return out;
+  },
+
+  async pullDailyRequests(key, startMs) {
+    const startUnix = Math.floor(startMs / 1000);
+    const out: DailyRequests[] = [];
+    let page: string | undefined;
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const params = new URLSearchParams({
+        start_time: String(startUnix),
+        bucket_width: "1d",
+        limit: "31",
+      });
+      if (page) params.set("page", page);
+      const res = await fetch(
+        `https://api.openai.com/v1/organization/usage/completions?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${key}` } },
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("[ve-track][connectors] openai usage failed", res.status, body.slice(0, 300));
+        throw new Error(`OpenAI usage responded ${res.status}`);
+      }
+      const data: any = await res.json();
+      for (const bucket of data?.data ?? []) {
+        const day = unixToDay(Number(bucket?.start_time ?? 0));
+        let requests = 0;
+        for (const r of bucket?.results ?? [])
+          requests += Number(r?.num_model_requests ?? 0);
+        if (requests > 0) out.push({ day, requests });
       }
       if (data?.has_more && data?.next_page) page = data.next_page;
       else break;
@@ -136,7 +183,11 @@ const anthropic: ConnectorAdapter = {
         `https://api.anthropic.com/v1/organizations/cost_report?${params.toString()}`,
         { headers: anthropicHeaders(key) },
       );
-      if (!res.ok) throw new Error(`Anthropic cost_report responded ${res.status}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("[ve-track][connectors] anthropic cost_report failed", res.status, body.slice(0, 300));
+        throw new Error(`Anthropic cost_report responded ${res.status}`);
+      }
       const data: any = await res.json();
       for (const bucket of data?.data ?? []) {
         const day = String(bucket?.starting_at ?? "").slice(0, 10);

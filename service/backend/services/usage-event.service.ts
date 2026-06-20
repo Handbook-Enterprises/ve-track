@@ -82,6 +82,7 @@ const baseFilters = (
   clerk_org_id: query.clerk_org_id || undefined,
   clerk_user_id: query.clerk_user_id || undefined,
   action: query.action || undefined,
+  correlation_id: query.correlation_id || undefined,
 });
 
 const validateEvent = (e: UsageEventInput) => {

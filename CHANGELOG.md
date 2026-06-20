@@ -4,6 +4,85 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.5.5 — 2026-06-20
+
+### Tracker cost moved out of usage_events into its own table
+
+Provider-billing cost from manual trackers is no longer written into `usage_events`. Direct API usage has no app and produces no usage events, so it now lives in a dedicated `tracker_costs` table (migration `0018`), keyed per tracker per day with `cost_usd` and `requests`. This cleanly separates SDK app telemetry from connected-account billing.
+
+- **Sync** aggregates the provider pull to one row per day and upserts into `tracker_costs`; the account's `pulled_cost_usd` is summed from there.
+- **Account detail** reads from a new endpoint, `GET /api/dashboard/trackers/:id/costs?from=&to=`, returning the saved daily series + totals (Spend, Calls). Disconnecting a tracker now also deletes its saved cost history.
+- **`usage_events` reverted to SDK-only:** removed the billing/carrier writes, dropped the `request_count`-based requests aggregation (back to `COUNT(*)`), and removed `request_count` from the model. The column added by migration `0017` is now unused and can be dropped at your convenience; leaving it is harmless.
+
+### Self-host
+- Apply migration `0018_tracker_costs.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`).
+
+## v0.5.4 — 2026-06-20
+
+### Daily tracker scraping moved to a Cloudflare Queue
+
+The daily provider-cost pull no longer runs as a sequential loop inside the cron. A daily cron (`0 3 * * *`) now **enqueues one message per active tracker** onto a `TRACKER_QUEUE`, and a queue consumer (`backend/consumers/tracker.consumer.ts`) syncs each tracker independently, with retries (`max_retries: 3`). This isolates failures per tracker, parallelizes the work, and avoids the single-cron time ceiling as the number of trackers grows. The pulled cost is upserted into `usage_events` as before, so the detail sheet keeps reading saved history from the database (never the live provider API). The hourly cron still refreshes the models.dev pricing catalog.
+
+### Self-host — create the queue before deploying
+- `cd service && wrangler queues create ve-track-tracker-sync`
+- Then `wrangler types` (already committed) and deploy. Without the queue the worker falls back to the in-cron sequential sync, so nothing breaks, but creating the queue is what enables the consumer path.
+
+## v0.5.3 — 2026-06-19
+
+### Tracker detail: spend over time, real call counts, tokens dropped
+
+- **Spend over time is retained.** Each tracker's authoritative daily cost is pulled on the cron and upserted into `usage_events` per day, so the account detail sheet's graph accumulates real history over time.
+- **Real call counts.** Added a `request_count` column to `usage_events` (migration `0017`); the requests metric is now `SUM(COALESCE(request_count, 1))`, so SDK events still count as one each while provider-billing rows carry the provider's reported request count. OpenAI request counts are pulled from `/v1/organization/usage/completions`. Anthropic's cost API does not expose request counts, so Calls/Avg-per-call show `—` for Anthropic trackers.
+- **Detail sheets.** The tracker (cost-only) sheet is now just the spend graph + summary (Spend, Calls, Avg/call) with the model breakdown removed. Token counts were removed from both the tracker and the usage provider detail sheets.
+
+### Self-host
+- Apply migration `0017_usage_request_count.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`). Backward compatible: existing rows have a null `request_count` and keep counting as one request each.
+
+## v0.5.2 — 2026-06-19
+
+### Trackers: rotate a key, key-failure email alerts, collapsible provider rows
+
+- **Rotate an account's key.** When a provider revokes, rotates, or expires a key, you can paste a fresh one in place from the account row (`PATCH /api/dashboard/trackers/:id`). The new key is re-validated with the provider and re-encrypted before the old one is replaced, and the tracker resumes pulling immediately.
+- **Email alert on key failure.** When a sync fails with an auth error (revoked/expired key), ve-track emails the workspace owner once (via Resend) with a link to update the key, and only re-alerts after the next healthy→failed transition (no repeat spam each cron tick). Requires `RESEND_API_KEY` and `RESEND_FROM_EMAIL` to be set; without them the alert is skipped silently.
+- **Collapsible providers.** The Trackers page reads as a table of providers; each row collapses/expands with a chevron to reveal its accounts.
+
+## v0.5.1 — 2026-06-19
+
+### Trackers simplified: provider + key, accounts combine per provider
+
+Connecting a provider account no longer asks for a tracker name or an app. Direct API usage is not tied to an app you built, so those fields were noise. A tracker is now just **provider + key**.
+
+- **Identity is the provider account.** Connecting the same account again is rejected with a clear "you are already tracking costs from this provider account."
+- **Different accounts of the same provider combine.** Add as many keys as you use; their costs add up under one provider total instead of being split out as separate organizations.
+- Pulled cost rows now attribute to the `external` app bucket (direct, non-app spend) rather than a user-entered app name.
+
+### Self-host
+- Apply migration `0016_trackers_drop_label_app.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`) — which drops the `label` and `app` columns from `trackers`.
+
+## v0.5 — 2026-06-19
+
+### First-class dimension entities: Apps, Actions, People, Organizations, Models
+
+The four attribution dimensions that used to live only as denormalized strings on `usage_events` are now first-class, tenant-scoped records you can manage, with full CRUD over the authenticated dashboard API. They link back to live event data by key (apps/actions by `slug`, people/organizations by `external_id`, which is the Clerk id), and relationships are optional (`action.app_slug`, `person.organization_external_id`) so the model works flat or hierarchical.
+
+- **Tables (migrations `0014_dimension_entities.sql`, `0015_models.sql`):** `apps`, `actions`, `people`, `organizations`, `models`. Each is tenant-scoped with `status` + timestamps; `actions` carry an optional `app_slug` and `credits_per_call`; `people` carry `email`, `avatar_url`, and an optional `organization_external_id`; `models` key on `(provider, model_id)` and line up with the global `model_pricing` catalog without duplicating pricing.
+- **Endpoints (Clerk-authenticated, tenant-scoped):** `GET/POST /api/dashboard/{apps,actions,people,organizations,models}` and `GET/PATCH/DELETE /api/dashboard/{...}/:id`. Each follows the existing service contract (`{ success, message, data }`) with duplicate and not-found guards.
+- **Architecture:** standard per-entity vertical slices (model → repository → service → routes + messages + interface). The five CRUD controllers were collapsed into one reusable `createCrudController(service)` factory since they were identical apart from the service.
+
+### Self-host
+- Apply migrations `0014` and `0015` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`) — to create the five tables. No change to existing data; `usage_events` is untouched and these records are additive.
+
+## v0.4.1 — 2026-06-19
+
+### Trackers refinements: add-method chooser, multiple accounts per provider
+
+- **"Add a tracker" now asks how the spend reaches you first.** Two paths: **Integrate into an app** (shows the one-line `trackedHandler` snippet, a Copy button, a link to the full docs, and a Get-API-key shortcut) or **Add manually** (the connect-an-account form, for spend made directly against a provider outside any app you built). This removes the confusion where people did not realize manual mode is specifically for non-app, direct API usage.
+- **Multiple accounts per provider.** The Trackers page now groups by provider. Clicking a provider opens a sheet listing each connected account. A single provider can hold more than one billing **organization** (e.g. two different OpenAI orgs), detected via the key, and the UI calls that out clearly so their costs are never assumed to be the same account. Each tracker now stores an `account_ref` (OpenAI org id, or `acct ····<last4>` where the provider does not expose one).
+- **Docs: Copy for LLM.** The `/docs` page has a "Copy for LLM" button that copies a complete, self-contained integration guide to the clipboard for pasting into an assistant.
+
+### Self-host
+- Apply migration `0013` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`) — which renames the `cost_trackers` table to `trackers` and adds the `account_ref` column. The model is now exported as `Tracker`.
+
 ## v0.4 — 2026-06-18
 
 ### Trackers — connect a provider account for ground-truth cost (Cost Connectors Phase 1)

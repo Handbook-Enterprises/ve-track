@@ -2,10 +2,13 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService from "./usage-event.service";
-import CostTrackerService from "./cost-tracker.service";
+import TrackerService from "./tracker.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
-import type { CostTrackerCreateBody } from "../interfaces/cost-tracker.interface";
+import type {
+  TrackerCreateBody,
+  TrackerUpdateKeyBody,
+} from "../interfaces/tracker.interface";
 import type {
   UsageGroup,
   UsageQuery,
@@ -38,16 +41,16 @@ class DashboardService {
   }
 
   static async listTrackers(db: DrizzleD1Database, tenantId: string) {
-    return CostTrackerService.listForTenant(db, tenantId);
+    return TrackerService.listForTenant(db, tenantId);
   }
 
   static async createTracker(
     db: DrizzleD1Database,
     env: Env,
     tenantId: string,
-    body: CostTrackerCreateBody,
+    body: TrackerCreateBody,
   ) {
-    return CostTrackerService.create(db, env, tenantId, body);
+    return TrackerService.create(db, env, tenantId, body);
   }
 
   static async disconnectTracker(
@@ -55,11 +58,30 @@ class DashboardService {
     tenantId: string,
     id: string,
   ) {
-    return CostTrackerService.disconnect(db, tenantId, id);
+    return TrackerService.disconnect(db, tenantId, id);
   }
 
   static async syncTracker(db: DrizzleD1Database, env: Env, id: string) {
-    return CostTrackerService.sync(db, env, id);
+    return TrackerService.sync(db, env, id);
+  }
+
+  static async updateTrackerKey(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    id: string,
+    body: TrackerUpdateKeyBody,
+  ) {
+    return TrackerService.updateKey(db, env, tenantId, id, body);
+  }
+
+  static async getTrackerCosts(
+    db: DrizzleD1Database,
+    tenantId: string,
+    id: string,
+    query: { from?: string; to?: string },
+  ) {
+    return TrackerService.getCostDetail(db, tenantId, id, query);
   }
 
   static async getOverview(

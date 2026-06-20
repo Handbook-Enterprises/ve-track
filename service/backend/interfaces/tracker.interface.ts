@@ -1,6 +1,12 @@
-export interface CostTrackerCreateBody {
+export interface TrackerCreateBody {
   provider?: string;
-  label?: string;
-  app?: string;
   apiKey?: string;
+}
+
+export interface TrackerUpdateKeyBody {
+  apiKey?: string;
+}
+
+export interface TrackerSyncMessage {
+  trackerId: string;
 }

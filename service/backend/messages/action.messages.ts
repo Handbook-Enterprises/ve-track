@@ -1,0 +1,10 @@
+export const ActionMessages = {
+  CREATE_SUCCESS: "Action created successfully",
+  LIST_SUCCESS: "Actions fetched successfully",
+  FETCH_SUCCESS: "Action fetched successfully",
+  UPDATE_SUCCESS: "Action updated successfully",
+  DELETE_SUCCESS: "Action deleted successfully",
+  NOT_FOUND: "Action not found",
+  DUPLICATE: "An action with that slug already exists for this app",
+  VALIDATION_ERROR: "Provide a name for the action",
+};
