@@ -13,6 +13,7 @@ interface BaseFilters {
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;
+  correlation_id?: string;
 }
 
 const buildWhere = (filters: BaseFilters) => {
@@ -29,6 +30,8 @@ const buildWhere = (filters: BaseFilters) => {
   if (filters.clerk_user_id)
     conditions.push(eq(UsageEvent.clerk_user_id, filters.clerk_user_id));
   if (filters.action) conditions.push(eq(UsageEvent.action, filters.action));
+  if (filters.correlation_id)
+    conditions.push(eq(UsageEvent.correlation_id, filters.correlation_id));
   return and(...conditions);
 };
 

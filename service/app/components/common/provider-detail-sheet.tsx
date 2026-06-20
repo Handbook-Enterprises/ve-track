@@ -130,7 +130,6 @@ export default function ProviderDetailSheet({
   const totals = overview?.totals;
   const cost = totals?.cost_usd ?? 0;
   const calls = totals?.requests ?? 0;
-  const tokens = (totals?.prompt_tokens ?? 0) + (totals?.completion_tokens ?? 0);
   const avg = calls > 0 ? cost / calls : 0;
 
   return (
@@ -156,13 +155,15 @@ export default function ProviderDetailSheet({
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-px bg-border">
+          <div className="grid grid-cols-3 gap-px bg-border">
             <HeadlineStat label="Spend" value={formatMoney(cost)} accent />
-            <HeadlineStat label="Avg/call" value={formatMoney(avg)} />
-            <HeadlineStat label="Calls" value={formatNumber(calls)} />
             <HeadlineStat
-              label="Tokens"
-              value={tokens > 0 ? formatNumber(tokens) : "—"}
+              label="Avg/call"
+              value={calls > 0 ? formatMoney(avg) : "—"}
+            />
+            <HeadlineStat
+              label="Calls"
+              value={calls > 0 ? formatNumber(calls) : "—"}
             />
           </div>
         </SheetHeader>

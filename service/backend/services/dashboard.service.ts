@@ -2,8 +2,13 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService from "./usage-event.service";
+import TrackerService from "./tracker.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
+import type {
+  TrackerCreateBody,
+  TrackerUpdateKeyBody,
+} from "../interfaces/tracker.interface";
 import type {
   UsageGroup,
   UsageQuery,
@@ -33,6 +38,50 @@ class DashboardService {
 
   static async revokeApiKey(db: DrizzleD1Database, id: string) {
     return ApiKeyService.revoke(db, id);
+  }
+
+  static async listTrackers(db: DrizzleD1Database, tenantId: string) {
+    return TrackerService.listForTenant(db, tenantId);
+  }
+
+  static async createTracker(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    body: TrackerCreateBody,
+  ) {
+    return TrackerService.create(db, env, tenantId, body);
+  }
+
+  static async disconnectTracker(
+    db: DrizzleD1Database,
+    tenantId: string,
+    id: string,
+  ) {
+    return TrackerService.disconnect(db, tenantId, id);
+  }
+
+  static async syncTracker(db: DrizzleD1Database, env: Env, id: string) {
+    return TrackerService.sync(db, env, id);
+  }
+
+  static async updateTrackerKey(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    id: string,
+    body: TrackerUpdateKeyBody,
+  ) {
+    return TrackerService.updateKey(db, env, tenantId, id, body);
+  }
+
+  static async getTrackerCosts(
+    db: DrizzleD1Database,
+    tenantId: string,
+    id: string,
+    query: { from?: string; to?: string },
+  ) {
+    return TrackerService.getCostDetail(db, tenantId, id, query);
   }
 
   static async getOverview(

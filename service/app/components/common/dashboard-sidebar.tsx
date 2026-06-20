@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { Activity, KeyRound, LayoutDashboard } from "lucide-react";
+import { Activity, KeyRound, LayoutDashboard, PlugZap } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +20,7 @@ const NAV = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "API Keys", url: "/dashboard/keys", icon: KeyRound },
   { title: "Usage", url: "/dashboard/usage", icon: Activity },
+  { title: "Trackers", url: "/dashboard/trackers", icon: PlugZap },
 ];
 
 export default function DashboardSidebar() {

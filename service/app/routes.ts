@@ -17,5 +17,6 @@ export default [
     route("dashboard", "routes/dashboard/overview.tsx", { id: "dashboard-overview" }),
     route("dashboard/keys", "routes/dashboard/keys.tsx", { id: "dashboard-keys" }),
     route("dashboard/usage", "routes/dashboard/usage.tsx", { id: "dashboard-usage" }),
+    route("dashboard/trackers", "routes/dashboard/trackers.tsx", { id: "dashboard-trackers" }),
   ]),
 ] satisfies RouteConfig;

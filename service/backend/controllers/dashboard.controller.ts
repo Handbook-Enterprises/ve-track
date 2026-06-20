@@ -58,6 +58,81 @@ class DashboardController {
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
 
+  static async listTrackersController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      DashboardService.listTrackers(db, tenantId),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async createTrackerController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const body = await c.req.json();
+    const [error, data] = await manageAsyncOps(
+      DashboardService.createTracker(db, c.env, tenantId, body),
+    );
+    if (error) throw error;
+    if (data?.tracker?.id) {
+      c.executionCtx.waitUntil(
+        DashboardService.syncTracker(db, c.env, data.tracker.id),
+      );
+    }
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async disconnectTrackerController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const id = c.req.param("id")!;
+    const [error, data] = await manageAsyncOps(
+      DashboardService.disconnectTracker(db, tenantId, id),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async syncTrackerController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const id = c.req.param("id")!;
+    const [error, data] = await manageAsyncOps(
+      DashboardService.syncTracker(db, c.env, id),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async trackerCostsController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const id = c.req.param("id")!;
+    const [error, data] = await manageAsyncOps(
+      DashboardService.getTrackerCosts(db, tenantId, id, c.req.query()),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async updateTrackerController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const id = c.req.param("id")!;
+    const body = await c.req.json();
+    const [error, data] = await manageAsyncOps(
+      DashboardService.updateTrackerKey(db, c.env, tenantId, id, body),
+    );
+    if (error) throw error;
+    if (data?.tracker?.id) {
+      c.executionCtx.waitUntil(
+        DashboardService.syncTracker(db, c.env, data.tracker.id),
+      );
+    }
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
   static async overviewController(c: DashContext) {
     const db = drizzle(c.env.DB);
     const tenantId = c.get("tenantId");
