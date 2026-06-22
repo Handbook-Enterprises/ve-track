@@ -7,6 +7,7 @@ import StatCard from "~/components/common/stat-card";
 import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
 import ProviderRanking from "~/components/common/provider-ranking";
+import QuickActions from "~/components/common/quick-actions";
 import { LoadingElement } from "~/components/elements";
 import { formatMoney } from "~/utils/format";
 import {
@@ -121,6 +122,8 @@ export default function OverviewPage() {
           className="[&_p.font-mono]:capitalize"
         />
       </div>
+
+      <QuickActions />
 
       <SectionCard title="Overview" caption={range.label}>
         <div className="p-5">
