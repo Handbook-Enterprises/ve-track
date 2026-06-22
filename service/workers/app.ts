@@ -8,7 +8,7 @@ import { trackerConsumer } from "../backend/consumers/tracker.consumer";
 import type { TrackerSyncMessage } from "../backend/interfaces/tracker.interface";
 import { SENTRY_DSN } from "~/lib/sentry";
 
-const DAILY_CRON = "0 3 * * *";
+const DAILY_CRON = "0 0 * * *";
 
 declare module "react-router" {
   export interface AppLoadContext {

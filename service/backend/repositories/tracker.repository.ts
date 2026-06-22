@@ -14,6 +14,11 @@ const PUBLIC_COLUMNS = {
   last_error: Tracker.last_error,
   last_synced_at: Tracker.last_synced_at,
   pulled_cost_usd: Tracker.pulled_cost_usd,
+  monthly_spend: Tracker.monthly_spend,
+  weekly_spend: Tracker.weekly_spend,
+  balance_usd: Tracker.balance_usd,
+  credits_remaining: Tracker.credits_remaining,
+  request_count: Tracker.request_count,
   created_at: Tracker.created_at,
   updated_at: Tracker.updated_at,
 };

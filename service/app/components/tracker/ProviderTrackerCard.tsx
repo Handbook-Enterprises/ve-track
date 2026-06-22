@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Building2, ChevronDown, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  KeyRound,
+  MoreVertical,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,12 +16,19 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { ButtonElement } from "~/components/elements";
 import EditKeyDialog from "./EditKeyDialog";
 import { providerLabel } from "~/utils/providers";
-import { formatMoney, formatRelativeTime } from "~/utils/format";
+import { formatRelativeTime } from "~/utils/format";
+import { primaryMetric, formatMetric } from "~/utils/tracker-metric";
 import { cn } from "~/lib/utils";
 import type { ProviderGroup, Tracker } from "~/types/tracker.types";
 
@@ -74,10 +88,10 @@ export default function ProviderTrackerCard({
         </div>
         <div className="text-right">
           <p className="font-mono text-[14px] font-semibold tabular-nums">
-            {formatMoney(group.totalCost)}
+            {group.metricValue}
           </p>
           <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">
-            pulled
+            {group.metricLabel}
           </p>
         </div>
         <ChevronDown
@@ -129,6 +143,9 @@ function AccountRow({
   onOpen: () => void;
 }) {
   const ok = account.status === "active";
+  const primary = primaryMetric(account);
+  const [editOpen, setEditOpen] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
   return (
     <div
       role="button"
@@ -168,35 +185,65 @@ function AccountRow({
           ok ? "bg-emerald-500" : "bg-destructive",
         )}
       />
-      <p className="w-20 shrink-0 text-right font-mono text-[12px] font-semibold tabular-nums">
-        {formatMoney(account.pulled_cost_usd)}
-      </p>
+      <div className="w-24 shrink-0 text-right">
+        <p className="font-mono text-[12px] font-semibold tabular-nums">
+          {formatMetric(primary.value, primary.isMoney)}
+        </p>
+        <p className="font-mono text-[8.5px] uppercase tracking-[0.14em] text-muted-foreground">
+          {primary.label}
+        </p>
+      </div>
       <div
-        className="flex shrink-0 items-center gap-1"
+        className="flex shrink-0 items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <EditKeyDialog account={account} onSubmit={onUpdateKey} />
-        <ButtonElement
-          variant="ghost"
-          size="icon"
-          loading={syncing}
-          onClick={() => onSync(account.id)}
-          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          title="Refresh"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </ButtonElement>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <ButtonElement
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              title="Disconnect"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              title="Account actions"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </ButtonElement>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+              <KeyRound className="h-3.5 w-3.5" />
+              Update key
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={syncing}
+              onSelect={(e) => {
+                e.preventDefault();
+                onSync(account.id);
+              }}
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+              />
+              {syncing ? "Refreshing…" : "Refresh"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setDisconnectOpen(true)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-            </ButtonElement>
-          </AlertDialogTrigger>
+              Disconnect
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <EditKeyDialog
+          account={account}
+          onSubmit={onUpdateKey}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+
+        <AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Disconnect this account?</AlertDialogTitle>

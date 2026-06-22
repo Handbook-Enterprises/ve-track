@@ -20,6 +20,8 @@ import {
 } from "~/components/ui/select";
 import { Input } from "~/components/ui/input";
 import { ButtonElement } from "~/components/elements";
+import DataForSeoAuthFields from "./DataForSeoAuthFields";
+import ZyteAuthFields from "./ZyteAuthFields";
 import type { TrackerCreatePayload } from "~/types/tracker.types";
 
 const PROVIDERS = [
@@ -34,6 +36,30 @@ const PROVIDERS = [
     label: "Anthropic",
     keyHint: "Admin key, starts with sk-ant-admin (organization account)",
     placeholder: "sk-ant-admin-…",
+  },
+  {
+    value: "openrouter",
+    label: "OpenRouter",
+    keyHint: "Provisioning key from Settings → Provisioning Keys",
+    placeholder: "sk-or-v1-…",
+  },
+  {
+    value: "apify",
+    label: "Apify",
+    keyHint: "Personal API token from Settings → Integrations",
+    placeholder: "apify_api_…",
+  },
+  {
+    value: "dataforseo",
+    label: "DataForSEO",
+    keyHint: "Your DataForSEO credentials from the API access page",
+    placeholder: "Paste your Base64 API key",
+  },
+  {
+    value: "zyte",
+    label: "Zyte",
+    keyHint: "Your Stats dashboard API key and organization id",
+    placeholder: "Stats dashboard API key",
   },
 ] as const;
 
@@ -53,7 +79,11 @@ export default function ManualConnectForm({ onSubmit, loading }: Props) {
     defaultValues: { provider: "openai", apiKey: "" },
   });
 
-  const selected = PROVIDERS.find((p) => p.value === form.watch("provider"));
+  const provider = form.watch("provider");
+  const selected = PROVIDERS.find((p) => p.value === provider);
+  const isDfo = provider === "dataforseo";
+  const isZyte = provider === "zyte";
+  const isComposite = isDfo || isZyte;
 
   const handleSubmit = async (data: TrackerCreatePayload) => {
     await onSubmit(data);
@@ -70,7 +100,13 @@ export default function ManualConnectForm({ onSubmit, loading }: Props) {
               <FormLabel className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 Provider
               </FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
+              <Select
+                value={field.value}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  form.setValue("apiKey", "", { shouldValidate: false });
+                }}
+              >
                 <FormControl>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Pick a provider" />
@@ -99,20 +135,38 @@ export default function ManualConnectForm({ onSubmit, loading }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                API key
+                {isComposite ? "Authentication" : "API key"}
               </FormLabel>
-              <FormControl>
-                <Input
-                  autoComplete="off"
-                  placeholder={selected?.placeholder ?? "Paste your key"}
-                  {...field}
+
+              {isDfo ? (
+                <DataForSeoAuthFields
+                  onChange={(value) =>
+                    form.setValue("apiKey", value, { shouldValidate: true })
+                  }
                 />
-              </FormControl>
-              <FormDescription className="flex items-center gap-1.5 text-[11px]">
-                <ShieldCheck className="h-3 w-3 text-[#fd5200]" />
-                {selected?.keyHint ??
-                  "We encrypt it and only show the last 4."}
-              </FormDescription>
+              ) : isZyte ? (
+                <ZyteAuthFields
+                  onChange={(value) =>
+                    form.setValue("apiKey", value, { shouldValidate: true })
+                  }
+                />
+              ) : (
+                <>
+                  <FormControl>
+                    <Input
+                      autoComplete="off"
+                      placeholder={selected?.placeholder ?? "Paste your key"}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription className="flex items-center gap-1.5 text-[11px]">
+                    <ShieldCheck className="h-3 w-3 text-[#fd5200]" />
+                    {selected?.keyHint ??
+                      "We encrypt it and only show the last 4."}
+                  </FormDescription>
+                </>
+              )}
+
               <FormMessage />
             </FormItem>
           )}

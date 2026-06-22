@@ -2,7 +2,15 @@ export type TrackerStatus = "active" | "error";
 
 export type AddMethod = "integrate" | "manual";
 
-export interface Tracker {
+export interface TrackerMetrics {
+  monthly_spend: number | null;
+  weekly_spend: number | null;
+  balance_usd: number | null;
+  credits_remaining: number | null;
+  request_count: number | null;
+}
+
+export interface Tracker extends TrackerMetrics {
   id: string;
   provider: string;
   key_last4: string;
@@ -11,6 +19,8 @@ export interface Tracker {
   last_error: string | null;
   last_synced_at: number | null;
   pulled_cost_usd: number;
+  window_spend: number;
+  is_money: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +34,8 @@ export interface ProviderGroup {
   provider: string;
   accounts: Tracker[];
   totalCost: number;
+  metricLabel: string;
+  metricValue: string;
   distinctOrgs: number;
   hasError: boolean;
 }
@@ -47,16 +59,21 @@ export interface TrackerActionResponse {
 
 export interface TrackerCostPoint {
   day: string;
-  cost_usd: number;
-  requests: number;
+  value: number;
 }
+
+export type TrackerMetricKind =
+  | "cumulative"
+  | "balance"
+  | "credits"
+  | "requests"
+  | "none";
 
 export interface TrackerCostDetail {
   series: TrackerCostPoint[];
-  totals: {
-    cost_usd: number;
-    requests: number;
-  };
+  metrics: TrackerMetrics;
+  kind: TrackerMetricKind;
+  isMoney: boolean;
 }
 
 export interface TrackerCostsResponse {

@@ -26,6 +26,29 @@ class TrackerCostRepository {
     return rows.length;
   }
 
+  static async incrementDay(
+    db: DrizzleD1Database,
+    row: {
+      id: string;
+      tracker_id: string;
+      tenant_id: string;
+      day: string;
+      ts: number;
+      cost_usd: number;
+    },
+  ): Promise<void> {
+    await db
+      .insert(TrackerCost)
+      .values(row)
+      .onConflictDoUpdate({
+        target: TrackerCost.id,
+        set: {
+          cost_usd: sql`${TrackerCost.cost_usd} + ${row.cost_usd}`,
+          updated_at: new Date().toISOString(),
+        },
+      });
+  }
+
   static async seriesBetween(
     db: DrizzleD1Database,
     trackerId: string,
