@@ -11,8 +11,13 @@ import { LoadingElement } from "~/components/elements";
 import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
 import { cn } from "~/lib/utils";
-import { formatMoney, formatNumber } from "~/utils/format";
 import { providerLabel } from "~/utils/providers";
+import {
+  CHART_LABEL,
+  formatMetric,
+  headlineMetrics,
+  metricKind,
+} from "~/utils/tracker-metric";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type { Tracker, TrackerCostDetail } from "~/types/tracker.types";
 
@@ -92,7 +97,7 @@ export default function TrackerDetailSheet({
         console.log("[ve-track][tracker-detail] loaded", {
           trackerId: account.id,
           points: data.detail.series.length,
-          totals: data.detail.totals,
+          metrics: data.detail.metrics,
         });
         if (!cancelled) setDetail(data.detail);
       })
@@ -109,9 +114,13 @@ export default function TrackerDetailSheet({
     };
   }, [open, account?.id, range.from, range.to, authFetch]);
 
-  const cost = detail?.totals.cost_usd ?? 0;
-  const calls = detail?.totals.requests ?? 0;
-  const avg = calls > 0 ? cost / calls : 0;
+  const boxes = account ? headlineMetrics(account) : [];
+  const kind = account ? metricKind(account) : "none";
+  const chartData = (detail?.series ?? []).map((p) => ({
+    day: p.day,
+    cost_usd: p.value,
+    requests: 0,
+  }));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -141,16 +150,24 @@ export default function TrackerDetailSheet({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-px bg-border">
-                <HeadlineStat label="Spend" value={formatMoney(cost)} accent />
-                <HeadlineStat
-                  label="Avg/call"
-                  value={calls > 0 ? formatMoney(avg) : "—"}
-                />
-                <HeadlineStat
-                  label="Calls"
-                  value={calls > 0 ? formatNumber(calls) : "—"}
-                />
+              <div
+                className="grid gap-px bg-border"
+                style={{
+                  gridTemplateColumns: `repeat(${boxes.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {boxes.map((box, i) => (
+                  <HeadlineStat
+                    key={box.label}
+                    label={box.label}
+                    value={
+                      box.value != null
+                        ? formatMetric(box.value, box.isMoney)
+                        : "—"
+                    }
+                    accent={i === 0}
+                  />
+                ))}
               </div>
             </SheetHeader>
 
@@ -168,10 +185,10 @@ export default function TrackerDetailSheet({
               <div className="space-y-6 pt-5">
                 <section>
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Spend over time · {range.label}
+                    {CHART_LABEL[kind]} · {range.label}
                   </p>
                   <SpendAreaChart
-                    data={detail.series}
+                    data={chartData}
                     from={range.from}
                     to={range.to}
                     emptyHint={null}

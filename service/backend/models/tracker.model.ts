@@ -20,6 +20,12 @@ const Tracker = sqliteTable(
     last_error: text(),
     last_synced_at: integer(),
     pulled_cost_usd: real().notNull().default(0),
+    cost_snapshot: real(),
+    monthly_spend: real(),
+    weekly_spend: real(),
+    balance_usd: real(),
+    credits_remaining: real(),
+    request_count: integer(),
     ...timestamps,
   },
   (t) => ({

@@ -1,6 +1,6 @@
 # Cost Connectors — connecting provider accounts for ground-truth cost
 
-Status: Phase 0 + Phase 1 shipped. Owner: Sylvester. Last updated: 2026-06-18.
+Status: Phase 0 + Phase 1 shipped; OpenRouter, Apify, DataForSEO, Zyte (Phase 2) shipped on the native per-provider metric model (see "Cost model v2"). Owner: Sylvester. Last updated: 2026-06-22.
 
 This is the plan for tracking spend from people who use provider APIs **directly** (scripting, notebooks, non ve-app work) and never touch the `@viewengine/track` package. The package keeps doing per-request attribution for ve-apps; this adds a second, parallel path: **connect a provider account once, we pull the actual cost from the provider on a schedule.**
 
@@ -33,15 +33,15 @@ The gateway stays a *future option* for customers who want real-time enforcement
 
 What each supported provider exposes to a connected key, the auth it needs, the identifier we dedup on, and the attribution granularity. Endpoints to be re-verified at build time.
 
-| Provider | Pull capability | Endpoint (verify at build) | Key type | Dedup id | Attribution | Phase |
-|---|---|---|---|---|---|---|
-| OpenAI | ✅ daily cost + usage | `/v1/organization/costs`, `/v1/organization/usage/*`; `/v1/me` for org id | **Admin** `sk-admin-…` | org id (`org-…`) | project / api key / model | 1 |
-| Anthropic | ✅ cost + usage report | Usage & Cost Admin API | **Admin** `sk-ant-admin…` (org accounts only) | org (key is org-scoped) | workspace / api key / model / tier | 1 |
-| OpenRouter | ✅ credits + activity | `/api/v1/credits`, `/api/v1/activity` (30d, by endpoint, filter by key hash / org member) | management key | org member id / key hash | endpoint / member | 2 |
-| Fal | ✅ usage + invoice | `/account/focus` (invoice or estimate), usage-by-model | **Admin** key | workspace/account | model | 2 |
-| Apify | ✅ monthly usage | `/v2/users/me/usage/monthly`, `/v2/users/me` | API token | user id | account (compute units → $) | 2 |
-| DataForSEO | ✅ spend + balance | `/v3/appendix/user_data` | login/password (basic) | account login | per API / endpoint | 2 |
-| Zyte | ✅ stats (cost) | `zyte-api-stats.zyte.com/api/stats?organization_id=…` | dashboard API key (basic) | organization id | account | 2 |
+| Provider | Metric shown | Endpoint (verify at build) | Key type | Dedup id | Phase |
+|---|---|---|---|---|---|
+| OpenAI | this month + 7 days (+requests) | `/v1/organization/costs` (month start, `bucket_width=1d`); `/v1/me` for org id | **Admin** `sk-admin-…` | org id (`org-…`) | 1 |
+| Anthropic | this month + 7 days | `/v1/organizations/cost_report` (month start, 1d) | **Admin** `sk-ant-admin…` (org accounts only) | org (key is org-scoped) | 1 |
+| OpenRouter | balance | `/api/v1/credits` (`total_credits − total_usage`) | **Provisioning** (management) key | hash of key | 2 ✅ |
+| Fal | usage + invoice | `/account/focus` (invoice or estimate), usage-by-model | **Admin** key | workspace/account | 2 |
+| Apify | this month | `/v2/users/me/limits` (`current.monthlyUsageUsd`); `/v2/users/me` for user id | API token (Bearer) | user id | 2 ✅ |
+| DataForSEO | balance | `/v3/appendix/user_data` (`money.balance`) | login/password or Base64 key (basic) | account login | 2 ✅ |
+| Zyte | this month + 7 days (+requests) | `zyte-api-stats.zyte.com/api/stats` ×2 windows (`cost_microusd_total` / 1e6) | Stats dashboard API key (basic) + org id | organization id | 2 ✅ |
 | BrightData | ⚠️ balance only | `/customer/balance` (balance + pending) | Bearer token | customer/account | none (poll balance, diff over time) | 3 |
 | Firecrawl | ⚠️ remaining tokens | `/v2/team/token-usage` (remaining, billing period) | API key | team/org | none (delta over time) | 3 |
 | Perplexity | ❌ no public cost API | dashboard only (by model, by key) | — | — | fallback: SDK per-request cost or manual import | 3 |
@@ -71,7 +71,32 @@ How Phase 1 is built:
 
 Setup note for deploy: set the secret once with `wrangler secret put CONNECTOR_ENC_KEY` (base64 of 32 random bytes, e.g. `openssl rand -base64 32`) and add it to `.dev.vars` for local dev. Without it, the Trackers API returns a clear "not configured" error and the cron pull is skipped.
 
-**Phase 2 — Account-key pulls: OpenRouter, Fal, Apify, DataForSEO, Zyte.** Each has a usage/cost endpoint reachable by an account key; mostly the same pipeline with per-provider adapters.
+**Phase 2 — Account-key pulls: OpenRouter, Fal, Apify, DataForSEO, Zyte.** OpenRouter, Apify, DataForSEO, and Zyte are SHIPPED; Fal remains.
+
+### Cost model v2 — native per-provider metric (current)
+
+Earlier iterations forced every provider into daily-spend accumulation, which is wrong: providers expose fundamentally different things (real daily spend vs prepaid balance vs credits). This model, ported from the proven ve-admin implementation, embraces that.
+
+Each adapter exposes `validate(key)` (connect/dedup) and a single **`pull(key): Promise<TrackerResult>`** where `TrackerResult = { monthlySpend, weeklySpend, balanceUsd, creditsRemaining, requestCount }` — all USD, `null` = not available. We show whichever metric the provider actually returns:
+
+| Provider | Endpoint | Metric shown |
+|---|---|---|
+| OpenAI | `/v1/organization/costs` (month start, `bucket_width=1d`) | This month + Past 7 days (+ requests) |
+| Anthropic | `/v1/organizations/cost_report` (month start, 1d) | This month + Past 7 days |
+| OpenRouter | `/api/v1/credits` | Balance (`total_credits − total_usage`) |
+| Apify | `/v2/users/me/limits` | This month (`current.monthlyUsageUsd`) |
+| DataForSEO | `/v3/appendix/user_data` | Balance (`money.balance`) |
+| Zyte | `/api/stats` ×2 (month + 7-day windows) | This month + Past 7 days (+ requests) |
+
+The UI picks the primary metric by priority (monthlySpend → balanceUsd → creditsRemaining → requestCount) via `app/utils/tracker-metric.ts`, shared by the provider card and the detail sheet; accounts of one provider share a metric type, so the provider total sums them.
+
+**Storage + history (`0020_tracker_metric_snapshots.sql`).** The latest metrics live on the `trackers` row (`monthly_spend`, `weekly_spend`, `balance_usd`, `credits_remaining`, `request_count`). A daily snapshot of those metrics is written to the new **`tracker_snapshots`** table (one row per tracker per day, id `<trackerId>_<day>`, upsert), which powers the trend chart.
+
+**Cron.** A **daily 00:00 UTC pull** (`wrangler.jsonc` cron `0 0 * * *` → `workers/app.ts` → `TrackerService.enqueueAll`/`syncAll`) refreshes every active tracker and saves that day's snapshot, so users accumulate provider history over time. Connect and manual "Refresh now" run the same `sync`.
+
+**Auth specifics:** OpenAI/Anthropic admin keys; OpenRouter provisioning key; Apify personal token; DataForSEO `login:password` or the Base64 API key (two-mode connect UI, `DataForSeoAuthFields`); Zyte **Stats dashboard** API key + organization id (two-field connect UI, `ZyteAuthFields`), Basic `base64(apiKey:)`.
+
+**Retired:** the snapshot-diff path, `pullCumulativeTotal`, `pullDailyCosts`/`pullDailyRequests`, and writing tracker spend into `usage_events`. The `cost_snapshot` column (`0019`) and the `tracker_costs` table are now legacy (left in place, no longer written; `tracker_costs` is cleared on disconnect).
 
 **Phase 3 — Partial / heavy / none: BrightData, Firecrawl (balance-delta), Gemini (Cloud Billing/BigQuery), Perplexity + Cloro (SDK capture or manual CSV import).**
 
@@ -104,7 +129,7 @@ Storing customers' **admin** keys makes VE Track a top-tier breach target — on
 
 - [OpenAI Costs API reference](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/costs) · [Usage + Cost cookbook](https://developers.openai.com/cookbook/examples/completions_usage_api) · [view org for a key (`/v1/me`)](https://help.openai.com/en/articles/9132009-how-can-i-view-the-users-or-organizations-associated-with-an-api-key)
 - [Anthropic Usage & Cost Admin API](https://platform.claude.com/docs/en/manage-claude/usage-cost-api) · [Vantage: connecting Anthropic](https://docs.vantage.sh/connecting_anthropic)
-- [OpenRouter credits](https://openrouter.ai/docs/api/api-reference/credits/get-credits) · [OpenRouter activity](https://openrouter.ai/docs/api/api-reference/analytics/get-user-activity)
+- [OpenRouter credits (`GET /api/v1/credits`)](https://openrouter.ai/docs/api/api-reference/credits/get-credits) · [OpenRouter activity (`GET /api/v1/activity`)](https://openrouter.ai/docs/api/api-reference/analytics/get-user-activity) · [OpenRouter management/provisioning keys](https://openrouter.ai/docs/guides/overview/auth/management-api-keys)
 - [Fal account/FOCUS billing](https://fal.ai/docs/platform-apis/v1/account/focus)
 - [Apify monthly usage](https://docs.apify.com/api/v2/users-me-usage-monthly-get)
 - [DataForSEO appendix/user_data](https://docs.dataforseo.com/v3/appendix-user-data/)

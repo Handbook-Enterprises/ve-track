@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useAuthContext } from "~/context/AuthContext";
 import { TrackerService } from "~/services/tracker.service";
 import { getErrorMessage } from "~/utils";
+import { primaryMetric, formatMetric } from "~/utils/tracker-metric";
 import type {
   ProviderGroup,
   Tracker,
@@ -21,10 +22,15 @@ const groupByProvider = (trackers: Tracker[]): ProviderGroup[] => {
       const distinctOrgs = new Set(
         accounts.map((a) => a.account_ref ?? a.key_last4),
       ).size;
+      const primary = accounts.map((a) => primaryMetric(a));
+      const isMoney = primary[0]?.isMoney ?? true;
+      const total = primary.reduce((s, p) => s + (p.value ?? 0), 0);
       return {
         provider,
         accounts,
-        totalCost: accounts.reduce((s, a) => s + (a.pulled_cost_usd ?? 0), 0),
+        totalCost: total,
+        metricLabel: primary[0]?.label ?? "No data yet",
+        metricValue: formatMetric(total, isMoney),
         distinctOrgs,
         hasError: accounts.some((a) => a.status === "error"),
       };

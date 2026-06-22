@@ -1,13 +1,18 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TrackerRepository } from "../repositories/tracker.repository";
 import { TrackerCostRepository } from "../repositories/tracker-cost.repository";
+import { TrackerSnapshotRepository } from "../repositories/tracker-snapshot.repository";
 import { TenantRepository } from "../repositories/tenant.repository";
 import {
   getAdapter,
   isConnectorProvider,
-  type DailyCost,
-  type DailyRequests,
+  type TrackerResult,
 } from "../lib/connectors";
+import {
+  metricKind,
+  isMoneyKind,
+  valueFor,
+} from "../lib/tracker-spend";
 import {
   sealApiKey,
   openApiKey,
@@ -28,6 +33,10 @@ import type {
 const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
+  openrouter: "OpenRouter",
+  apify: "Apify",
+  dataforseo: "DataForSEO",
+  zyte: "Zyte",
 };
 
 const labelFor = (provider: string): string =>
@@ -59,11 +68,49 @@ const buildKeyAlertHtml = (provider: string, accountRef: string): string => {
 };
 
 const DAY_MS = 86_400_000;
-const BACKFILL_DAYS = 30;
-const OVERLAP_DAYS = 2;
-const MAX_LOOKBACK_DAYS = 60;
 
-const round6 = (n: number): number => Math.round(n * 1_000_000) / 1_000_000;
+const round6 = (n: number | null): number | null =>
+  n == null ? null : Math.round(n * 1_000_000) / 1_000_000;
+
+const primaryValue = (m: {
+  monthly_spend?: number | null;
+  balance_usd?: number | null;
+  credits_remaining?: number | null;
+  request_count?: number | null;
+}): number =>
+  m.monthly_spend ??
+  m.balance_usd ??
+  m.credits_remaining ??
+  m.request_count ??
+  0;
+
+const metricColumns = (r: TrackerResult) => ({
+  monthly_spend: round6(r.monthlySpend),
+  weekly_spend: round6(r.weeklySpend),
+  balance_usd: round6(r.balanceUsd),
+  credits_remaining: r.creditsRemaining,
+  request_count: r.requestCount,
+});
+
+const publicTracker = (t: any) => ({
+  id: t.id,
+  provider: t.provider,
+  key_last4: t.key_last4,
+  account_ref: t.account_ref,
+  status: t.status,
+  last_error: t.last_error,
+  last_synced_at: t.last_synced_at,
+  pulled_cost_usd: t.pulled_cost_usd,
+  monthly_spend: t.monthly_spend ?? null,
+  weekly_spend: t.weekly_spend ?? null,
+  balance_usd: t.balance_usd ?? null,
+  credits_remaining: t.credits_remaining ?? null,
+  request_count: t.request_count ?? null,
+  window_spend: 0,
+  is_money: isMoneyKind(metricKind(t)),
+  created_at: t.created_at,
+  updated_at: t.updated_at,
+});
 
 const requireSecret = (env: Env): string => {
   if (!env.CONNECTOR_ENC_KEY) {
@@ -75,40 +122,23 @@ const requireSecret = (env: Env): string => {
   return env.CONNECTOR_ENC_KEY;
 };
 
-const buildDailyCostRows = (
-  tracker: { id: string; tenant_id: string },
-  costs: DailyCost[],
-  requests: DailyRequests[],
-) => {
-  const byDay = new Map<string, { cost: number; requests: number | null }>();
-  for (const c of costs) {
-    const entry = byDay.get(c.day) ?? { cost: 0, requests: null };
-    entry.cost += c.costUsd;
-    byDay.set(c.day, entry);
-  }
-  for (const r of requests) {
-    const entry = byDay.get(r.day) ?? { cost: 0, requests: null };
-    entry.requests = (entry.requests ?? 0) + r.requests;
-    byDay.set(r.day, entry);
-  }
-  return Array.from(byDay.entries()).map(([day, v]) => ({
-    id: `${tracker.id}_${day}`,
-    tracker_id: tracker.id,
-    tenant_id: tracker.tenant_id,
-    day,
-    ts: Date.parse(`${day}T00:00:00Z`),
-    cost_usd: round6(v.cost),
-    requests: v.requests,
-  }));
-};
-
 class TrackerService {
   static async listForTenant(db: DrizzleD1Database, tenantId: string) {
     const trackers = await TrackerRepository.fetchByTenant(db, tenantId);
+
+    const enriched = trackers.map((t) => {
+      const kind = metricKind(t);
+      return {
+        ...t,
+        window_spend: primaryValue(t),
+        is_money: isMoneyKind(kind),
+      };
+    });
+
     return {
       success: true,
       message: TrackerMessages.LIST_SUCCESS,
-      trackers,
+      trackers: enriched,
     };
   }
 
@@ -178,18 +208,7 @@ class TrackerService {
     return {
       success: true,
       message: TrackerMessages.CREATE_SUCCESS,
-      tracker: {
-        id: created.id,
-        provider: created.provider,
-        key_last4: created.key_last4,
-        account_ref: created.account_ref,
-        status: created.status,
-        last_error: created.last_error,
-        last_synced_at: created.last_synced_at,
-        pulled_cost_usd: created.pulled_cost_usd,
-        created_at: created.created_at,
-        updated_at: created.updated_at,
-      },
+      tracker: publicTracker(created),
     };
   }
 
@@ -201,6 +220,7 @@ class TrackerService {
         HTTP_STATUS_CODES.NOT_FOUND,
       );
     }
+    await TrackerSnapshotRepository.deleteForTracker(db, id);
     await TrackerCostRepository.deleteForTracker(db, id);
     await TrackerRepository.remove(db, id);
     return { success: true, message: TrackerMessages.DISCONNECT_SUCCESS };
@@ -219,51 +239,37 @@ class TrackerService {
         HTTP_STATUS_CODES.NOT_FOUND,
       );
     }
+    const now = Date.now();
     const from =
-      query.from != null ? parseInt(query.from, 10) : Date.now() - 30 * DAY_MS;
-    const to = query.to != null ? parseInt(query.to, 10) : undefined;
+      query.from != null ? parseInt(query.from, 10) : now - 28 * DAY_MS;
+    const to = query.to != null ? parseInt(query.to, 10) : now;
 
-    console.log("[ve-track][tracker] getCostDetail", {
-      trackerId: id,
-      provider: tracker.provider,
+    const kind = metricKind(tracker);
+    const isMoney = isMoneyKind(kind);
+    const snapshots = await TrackerSnapshotRepository.seriesBetween(
+      db,
+      id,
       from,
       to,
-    });
+    );
 
-    let series: Awaited<ReturnType<typeof TrackerCostRepository.seriesBetween>>;
-    let totals: Awaited<ReturnType<typeof TrackerCostRepository.totalsBetween>>;
-    try {
-      [series, totals] = await Promise.all([
-        TrackerCostRepository.seriesBetween(db, id, from, to),
-        TrackerCostRepository.totalsBetween(db, id, from, to),
-      ]);
-    } catch (err) {
-      console.error(
-        "[ve-track][tracker] getCostDetail query failed (is migration 0018_tracker_costs applied?)",
-        id,
-        err,
-      );
-      throw err;
-    }
-
-    console.log("[ve-track][tracker] getCostDetail result", {
-      trackerId: id,
-      points: series.length,
-      totals,
-    });
+    const series = snapshots
+      .map((s) => ({ day: s.day, value: valueFor(kind, s) }))
+      .filter((p): p is { day: string; value: number } => p.value != null);
 
     return {
       success: true,
       detail: {
-        series: series.map((s) => ({
-          day: s.day,
-          cost_usd: Number(s.cost_usd ?? 0),
-          requests: Number(s.requests ?? 0),
-        })),
-        totals: {
-          cost_usd: Number(totals.cost_usd ?? 0),
-          requests: Number(totals.requests ?? 0),
+        series,
+        metrics: {
+          monthly_spend: tracker.monthly_spend ?? null,
+          weekly_spend: tracker.weekly_spend ?? null,
+          balance_usd: tracker.balance_usd ?? null,
+          credits_remaining: tracker.credits_remaining ?? null,
+          request_count: tracker.request_count ?? null,
         },
+        kind,
+        isMoney,
       },
     };
   }
@@ -329,18 +335,7 @@ class TrackerService {
     return {
       success: true,
       message: TrackerMessages.UPDATE_SUCCESS,
-      tracker: {
-        id: updated.id,
-        provider: updated.provider,
-        key_last4: updated.key_last4,
-        account_ref: updated.account_ref,
-        status: updated.status,
-        last_error: updated.last_error,
-        last_synced_at: updated.last_synced_at,
-        pulled_cost_usd: updated.pulled_cost_usd,
-        created_at: updated.created_at,
-        updated_at: updated.updated_at,
-      },
+      tracker: publicTracker(updated),
     };
   }
 
@@ -358,42 +353,34 @@ class TrackerService {
     if (!adapter) return { success: false };
 
     const now = Date.now();
-    const floor = now - MAX_LOOKBACK_DAYS * DAY_MS;
-    const startMs = tracker.last_synced_at
-      ? Math.max(floor, tracker.last_synced_at - OVERLAP_DAYS * DAY_MS)
-      : now - BACKFILL_DAYS * DAY_MS;
+    const today = new Date(now).toISOString().slice(0, 10);
 
     try {
       const key = await openApiKey(secret, tracker.tenant_id, tracker);
-      const costs = await adapter.pullDailyCosts(key, startMs);
-      let requests: DailyRequests[] = [];
-      if (adapter.pullDailyRequests) {
-        try {
-          requests = await adapter.pullDailyRequests(key, startMs);
-        } catch (err) {
-          console.warn(
-            "[ve-track][tracker] request-count pull failed, saving cost only",
-            tracker.id,
-            err instanceof Error ? err.message : err,
-          );
-        }
-      }
-      const rows = buildDailyCostRows(tracker, costs, requests);
-      console.log("[ve-track][tracker] sync pulled", {
-        trackerId: tracker.id,
-        provider: tracker.provider,
-        costLines: costs.length,
-        requestDays: requests.length,
-        dayRows: rows.length,
-        sinceMs: startMs,
+      const result = await adapter.pull(key);
+      const metrics = metricColumns(result);
+
+      await TrackerSnapshotRepository.upsert(db, {
+        id: `${tracker.id}_${today}`,
+        tracker_id: tracker.id,
+        tenant_id: tracker.tenant_id,
+        day: today,
+        ts: Date.parse(`${today}T00:00:00Z`),
+        ...metrics,
       });
-      await TrackerCostRepository.upsertMany(db, rows);
-      const total = await TrackerCostRepository.sumForTracker(db, tracker.id);
+
       await TrackerRepository.update(db, id, {
         status: "active",
         last_error: null,
         last_synced_at: now,
-        pulled_cost_usd: round6(total),
+        pulled_cost_usd: primaryValue(metrics),
+        ...metrics,
+      });
+
+      console.log("[ve-track][tracker] sync pulled", {
+        trackerId: tracker.id,
+        provider: tracker.provider,
+        ...metrics,
       });
       return { success: true, message: TrackerMessages.SYNC_SUCCESS };
     } catch (err) {

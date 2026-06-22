@@ -1,10 +1,14 @@
 import {
   endOfDay,
+  endOfMonth,
+  endOfYear,
   format,
   startOfDay,
   startOfMonth,
   startOfYear,
   subDays,
+  subMonths,
+  subYears,
 } from "date-fns";
 
 export interface DateRange {
@@ -13,12 +17,7 @@ export interface DateRange {
   label: string;
 }
 
-export type RangePresetId =
-  | "this_month"
-  | "last_7"
-  | "last_30"
-  | "last_90"
-  | "this_year";
+export type RangePresetId = string;
 
 export interface RangePreset {
   id: RangePresetId;
@@ -32,38 +31,59 @@ const range = (from: Date, to: Date, label: string): DateRange => ({
   label,
 });
 
+const lastDays = (n: number, label: string): RangePreset => ({
+  id: `last_${n}`,
+  label,
+  build: () =>
+    range(startOfDay(subDays(new Date(), n - 1)), endOfDay(new Date()), label),
+});
+
+const yearPreset = (offset: number): RangePreset => {
+  const year = new Date().getFullYear() - offset;
+  return {
+    id: `year_${year}`,
+    label: String(year),
+    build: () => {
+      const anchor = subYears(new Date(), offset);
+      const to = offset === 0 ? endOfDay(new Date()) : endOfYear(anchor);
+      return range(startOfYear(anchor), to, String(year));
+    },
+  };
+};
+
+const monthPreset = (offset: number): RangePreset => {
+  const anchor = subMonths(new Date(), offset);
+  const label = format(anchor, "MMMM");
+  return {
+    id: `month_${offset}`,
+    label,
+    build: () => {
+      const m = subMonths(new Date(), offset);
+      const to = offset === 0 ? endOfDay(new Date()) : endOfMonth(m);
+      return range(startOfMonth(m), to, format(m, "MMMM"));
+    },
+  };
+};
+
 export const RANGE_PRESETS: RangePreset[] = [
+  lastDays(7, "Last 7 days"),
+  lastDays(28, "Last 28 days"),
+  lastDays(90, "Last 90 days"),
+  lastDays(365, "Last 365 days"),
   {
-    id: "this_month",
-    label: "This month",
-    build: () => range(startOfMonth(new Date()), endOfDay(new Date()), "This month"),
-  },
-  {
-    id: "last_7",
-    label: "Last 7 days",
+    id: "lifetime",
+    label: "Lifetime",
     build: () =>
-      range(startOfDay(subDays(new Date(), 6)), endOfDay(new Date()), "Last 7 days"),
+      range(startOfDay(subYears(new Date(), 5)), endOfDay(new Date()), "Lifetime"),
   },
-  {
-    id: "last_30",
-    label: "Last 30 days",
-    build: () =>
-      range(startOfDay(subDays(new Date(), 29)), endOfDay(new Date()), "Last 30 days"),
-  },
-  {
-    id: "last_90",
-    label: "Last 90 days",
-    build: () =>
-      range(startOfDay(subDays(new Date(), 89)), endOfDay(new Date()), "Last 90 days"),
-  },
-  {
-    id: "this_year",
-    label: "This year",
-    build: () => range(startOfYear(new Date()), endOfDay(new Date()), "This year"),
-  },
+  yearPreset(0),
+  yearPreset(1),
+  monthPreset(0),
+  monthPreset(1),
+  monthPreset(2),
 ];
 
-export const DEFAULT_PRESET_ID: RangePresetId = "this_month";
+export const DEFAULT_PRESET_ID: RangePresetId = "last_28";
 
 export const buildPreset = (id: RangePresetId): DateRange => {
   const preset = RANGE_PRESETS.find((p) => p.id === id) ?? RANGE_PRESETS[0];
