@@ -5,6 +5,7 @@ export const WINDOW_LABEL = "Last 28 days";
 
 export type MetricKind =
   | "cumulative"
+  | "usage"
   | "balance"
   | "credits"
   | "requests"
@@ -13,16 +14,18 @@ export type MetricKind =
 export const metricKind = (m: TrackerMetrics): MetricKind =>
   m.monthly_spend != null
     ? "cumulative"
-    : m.balance_usd != null
-      ? "balance"
-      : m.credits_remaining != null
-        ? "credits"
-        : m.request_count != null
-          ? "requests"
-          : "none";
+    : m.total_usage_usd != null
+      ? "usage"
+      : m.balance_usd != null
+        ? "balance"
+        : m.credits_remaining != null
+          ? "credits"
+          : m.request_count != null
+            ? "requests"
+            : "none";
 
 export const isMoneyKind = (kind: MetricKind): boolean =>
-  kind === "cumulative" || kind === "balance";
+  kind === "cumulative" || kind === "usage" || kind === "balance";
 
 export const metricValueFor = (
   kind: MetricKind,
@@ -31,6 +34,8 @@ export const metricValueFor = (
   switch (kind) {
     case "cumulative":
       return m.monthly_spend ?? null;
+    case "usage":
+      return m.total_usage_usd ?? null;
     case "balance":
       return m.balance_usd ?? null;
     case "credits":
@@ -44,6 +49,7 @@ export const metricValueFor = (
 
 const PRIMARY_LABEL: Record<MetricKind, string> = {
   cumulative: "This month",
+  usage: "Total Spend",
   balance: "Balance",
   credits: "Credits left",
   requests: "Requests",
@@ -52,6 +58,7 @@ const PRIMARY_LABEL: Record<MetricKind, string> = {
 
 export const CHART_LABEL: Record<MetricKind, string> = {
   cumulative: "Spend over time",
+  usage: "Spend per day",
   balance: "Balance over time",
   credits: "Credits over time",
   requests: "Requests over time",
@@ -85,6 +92,10 @@ export const headlineMetrics = (m: TrackerMetrics): MetricBox[] => {
     return [
       { label: "This month", value: m.monthly_spend ?? null, isMoney: true },
       { label: "Past 7 days", value: m.weekly_spend ?? null, isMoney: true },
+    ];
+  if (kind === "usage")
+    return [
+      { label: "Total Spend", value: m.total_usage_usd ?? null, isMoney: true },
     ];
   if (kind === "balance")
     return [{ label: "Balance", value: m.balance_usd ?? null, isMoney: true }];

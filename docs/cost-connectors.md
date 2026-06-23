@@ -1,6 +1,6 @@
 # Cost Connectors — connecting provider accounts for ground-truth cost
 
-Status: Phase 0 + Phase 1 shipped; OpenRouter, Apify, DataForSEO, Zyte (Phase 2) shipped on the native per-provider metric model (see "Cost model v2"). Owner: Sylvester. Last updated: 2026-06-22.
+Status: Phase 0 + Phase 1 + Phase 2 shipped. All six connectors (OpenAI, Anthropic, OpenRouter, Apify, DataForSEO, Zyte) now report a lifetime **Total Spend** with a stored per-day difference (see "Cost model v2" → "Total Spend providers"). Owner: Sylvester. Last updated: 2026-06-23.
 
 This is the plan for tracking spend from people who use provider APIs **directly** (scripting, notebooks, non ve-app work) and never touch the `@viewengine/track` package. The package keeps doing per-request attribution for ve-apps; this adds a second, parallel path: **connect a provider account once, we pull the actual cost from the provider on a schedule.**
 
@@ -35,13 +35,13 @@ What each supported provider exposes to a connected key, the auth it needs, the 
 
 | Provider | Metric shown | Endpoint (verify at build) | Key type | Dedup id | Phase |
 |---|---|---|---|---|---|
-| OpenAI | this month + 7 days (+requests) | `/v1/organization/costs` (month start, `bucket_width=1d`); `/v1/me` for org id | **Admin** `sk-admin-…` | org id (`org-…`) | 1 |
-| Anthropic | this month + 7 days | `/v1/organizations/cost_report` (month start, 1d) | **Admin** `sk-ant-admin…` (org accounts only) | org (key is org-scoped) | 1 |
-| OpenRouter | balance | `/api/v1/credits` (`total_credits − total_usage`) | **Provisioning** (management) key | hash of key | 2 ✅ |
+| OpenAI | Total Spend | `/v1/organization/costs` (lifetime daily sum from 2023-12-20, paged); `/v1/me` for org id | **Admin** `sk-admin-…` | org id (`org-…`) | 1 |
+| Anthropic | Total Spend | `/v1/organizations/cost_report` (lifetime daily sum, cents→USD, paged) | **Admin** `sk-ant-admin…` (org accounts only) | org (key is org-scoped) | 1 |
+| OpenRouter | Total Spend | `/api/v1/credits` (`total_usage`) | **Provisioning** (management) key | hash of key | 2 ✅ |
 | Fal | usage + invoice | `/account/focus` (invoice or estimate), usage-by-model | **Admin** key | workspace/account | 2 |
-| Apify | this month | `/v2/users/me/limits` (`current.monthlyUsageUsd`); `/v2/users/me` for user id | API token (Bearer) | user id | 2 ✅ |
-| DataForSEO | balance | `/v3/appendix/user_data` (`money.balance`) | login/password or Base64 key (basic) | account login | 2 ✅ |
-| Zyte | this month + 7 days (+requests) | `zyte-api-stats.zyte.com/api/stats` ×2 windows (`cost_microusd_total` / 1e6) | Stats dashboard API key (basic) + org id | organization id | 2 ✅ |
+| Apify | Total Spend | `/v2/users/me/usage/monthly` (sum cycles to `createdAt`; `dailyServiceUsages` for window); `/v2/users/me` for user id + createdAt | API token (Bearer) | user id | 2 ✅ |
+| DataForSEO | Total Spend | `/v3/appendix/user_data` (`money.total − money.balance`) | login/password or Base64 key (basic) | account login | 2 ✅ |
+| Zyte | Total Spend | `zyte-api-stats.zyte.com/api/stats` (lifetime window, `cost_microusd_total` / 1e6) | Stats dashboard API key (basic) + org id | organization id | 2 ✅ |
 | BrightData | ⚠️ balance only | `/customer/balance` (balance + pending) | Bearer token | customer/account | none (poll balance, diff over time) | 3 |
 | Firecrawl | ⚠️ remaining tokens | `/v2/team/token-usage` (remaining, billing period) | API key | team/org | none (delta over time) | 3 |
 | Perplexity | ❌ no public cost API | dashboard only (by model, by key) | — | — | fallback: SDK per-request cost or manual import | 3 |
@@ -77,20 +77,26 @@ Setup note for deploy: set the secret once with `wrangler secret put CONNECTOR_E
 
 Earlier iterations forced every provider into daily-spend accumulation, which is wrong: providers expose fundamentally different things (real daily spend vs prepaid balance vs credits). This model, ported from the proven ve-admin implementation, embraces that.
 
-Each adapter exposes `validate(key)` (connect/dedup) and a single **`pull(key): Promise<TrackerResult>`** where `TrackerResult = { monthlySpend, weeklySpend, balanceUsd, creditsRemaining, requestCount }` — all USD, `null` = not available. We show whichever metric the provider actually returns:
+Each adapter exposes `validate(key)` (connect/dedup) and a single **`pull(key): Promise<TrackerResult>`** where `TrackerResult = { monthlySpend, weeklySpend, balanceUsd, totalUsageUsd, creditsRemaining, requestCount }` — all USD, `null` = not available. We show whichever metric the provider actually returns:
 
 | Provider | Endpoint | Metric shown |
 |---|---|---|
-| OpenAI | `/v1/organization/costs` (month start, `bucket_width=1d`) | This month + Past 7 days (+ requests) |
-| Anthropic | `/v1/organizations/cost_report` (month start, 1d) | This month + Past 7 days |
-| OpenRouter | `/api/v1/credits` | Balance (`total_credits − total_usage`) |
-| Apify | `/v2/users/me/limits` | This month (`current.monthlyUsageUsd`) |
-| DataForSEO | `/v3/appendix/user_data` | Balance (`money.balance`) |
-| Zyte | `/api/stats` ×2 (month + 7-day windows) | This month + Past 7 days (+ requests) |
+| OpenAI | `/v1/organization/costs` (lifetime daily sum, paged) | Total Spend |
+| Anthropic | `/v1/organizations/cost_report` (lifetime daily sum, cents→USD) | Total Spend |
+| OpenRouter | `/api/v1/credits` | Total Spend (`total_usage`) |
+| Apify | `/v2/users/me/usage/monthly` (sum cycles + daily window) | Total Spend |
+| DataForSEO | `/v3/appendix/user_data` | Total Spend (`money.total − money.balance`) |
+| Zyte | `/api/stats` (lifetime window, no `groupby_time`) | Total Spend (`cost_microusd_total` / 1e6) |
 
-The UI picks the primary metric by priority (monthlySpend → balanceUsd → creditsRemaining → requestCount) via `app/utils/tracker-metric.ts`, shared by the provider card and the detail sheet; accounts of one provider share a metric type, so the provider total sums them.
+The UI picks the primary metric by priority (monthlySpend → totalUsageUsd → balanceUsd → creditsRemaining → requestCount) via `app/utils/tracker-metric.ts`, shared by the provider card and the detail sheet; accounts of one provider share a metric type, so the provider total sums them.
 
-**Storage + history (`0020_tracker_metric_snapshots.sql`).** The latest metrics live on the `trackers` row (`monthly_spend`, `weekly_spend`, `balance_usd`, `credits_remaining`, `request_count`). A daily snapshot of those metrics is written to the new **`tracker_snapshots`** table (one row per tracker per day, id `<trackerId>_<day>`, upsert), which powers the trend chart.
+**Total Spend providers (`usage` kind).** All six connectors report a monotonically increasing lifetime spend (`total_usage_usd`) and render as **Total Spend** (headline) plus **Spend per day** (chart). The per-day figure is the day-over-day difference of `total_usage_usd`, computed and stored at sync time in `tracker_snapshots.daily_spend`, so each day's actual spend is queryable without recomputation.
+
+Two sourcing strategies, both returning `totalUsageUsd`:
+- **Single-call exact lifetime:** OpenRouter (`total_usage`), DataForSEO (`money.total − money.balance`), Zyte (sum of `cost_microusd_total` over ≤364-day windows, since the stats API rejects ranges ≥366 days).
+- **Backfill once, then trailing-window incremental:** OpenAI, Anthropic, Apify. `sync()` passes a `PullContext { baseTotalUsd, fromDay }` derived from a finalized prior snapshot (the latest on/before `today − 10d`, falling back to the latest before today). With a base, the adapter fetches only spend after `fromDay` and returns `baseTotalUsd + window`; with no base (first sync) it pages the full history from the provider floor (OpenAI `2023-12-20`, Anthropic `2023-01-01`, Apify account `createdAt`). The 10-day overlap re-fetches recent days each sync so late-finalizing costs self-correct.
+
+**Storage + history (`0020_tracker_metric_snapshots.sql`, `0021_tracker_total_usage.sql`, `0022_tracker_daily_spend.sql`).** The latest metrics live on the `trackers` row (`monthly_spend`, `weekly_spend`, `balance_usd`, `total_usage_usd`, `credits_remaining`, `request_count`). A daily snapshot of those metrics — plus the derived `daily_spend` — is written to the **`tracker_snapshots`** table (one row per tracker per day, id `<trackerId>_<day>`, upsert), which powers the trend chart.
 
 **Cron.** A **daily 00:00 UTC pull** (`wrangler.jsonc` cron `0 0 * * *` → `workers/app.ts` → `TrackerService.enqueueAll`/`syncAll`) refreshes every active tracker and saves that day's snapshot, so users accumulate provider history over time. Connect and manual "Refresh now" run the same `sync`.
 
@@ -137,3 +143,16 @@ Storing customers' **admin** keys makes VE Track a top-tier breach target — on
 - [BrightData total balance](https://docs.brightdata.com/api-reference/account-management-api/Get_total_balance_through_API)
 - [Firecrawl token usage](https://docs.firecrawl.dev/api-reference/endpoint/token-usage)
 - [11 AI API cost tools 2026 (gateway vs billing-ingest)](https://blog.alephant.io/11-ai-api-cost-tools-for-multi-provider-spend-in-2026/) · [AWS KMS multi-tenant encryption](https://aws.amazon.com/blogs/architecture/simplify-multi-tenant-encryption-with-a-cost-conscious-aws-kms-key-strategy/)
+
+---
+
+## Rolling Total Spend + daily difference to every provider
+
+Decisions: true lifetime (backfill once), Total Spend only (drop Balance), reuse snapshot differencing for the daily figure. No migrations needed beyond `0021`/`0022`.
+
+- **Group A (one call, exact lifetime):** OpenRouter (`total_usage`, done), DataForSEO (`money.total − money.balance`, done), Zyte (≤364-day windowed sum, done).
+- **Group B (backfill once, then trailing-window incremental):** OpenAI (done), Anthropic (cents → USD, done), Apify (sum monthly cycles to `createdAt`, done).
+- **Frontend:** nothing to build — every provider resolves to the `usage` kind and inherits the Total Spend / Spend per day / No Spend Yet sheet automatically.
+
+All six connectors are now on the Total Spend model.
+Cloro, Fal, Serper, Firecrawl and Cloudflare

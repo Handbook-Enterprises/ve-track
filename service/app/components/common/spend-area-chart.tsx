@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   ChartContainer,
@@ -39,10 +40,45 @@ const fillSeries = (
   return out;
 };
 
+function EmptyGraph({
+  title,
+  hint,
+}: {
+  title: string;
+  hint?: string | null;
+}) {
+  return (
+    <div className="relative h-[18rem] w-full overflow-hidden border border-border bg-muted/20">
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to bottom, transparent 0, transparent 47px, var(--border) 47px, var(--border) 48px)",
+        }}
+      />
+      <div className="absolute inset-x-0 bottom-12 border-t border-dashed border-border" />
+      <div className="relative flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center">
+        <span className="flex h-10 w-10 items-center justify-center bg-primary/10 text-primary">
+          <TrendingUp className="h-[18px] w-[18px]" />
+        </span>
+        <p className="text-[13.5px] font-semibold tracking-tight text-foreground">
+          {title}
+        </p>
+        {hint ? (
+          <p className="max-w-[19rem] text-[12px] leading-relaxed text-muted-foreground">
+            {hint}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   data: UsageSeriesPoint[];
   from: number;
   to: number;
+  emptyTitle?: string;
   emptyHint?: string | null;
 }
 
@@ -50,6 +86,7 @@ export default function SpendAreaChart({
   data,
   from,
   to,
+  emptyTitle = "No spend yet",
   emptyHint = "Wire an app's VE_TRACK_KEY and the meter starts here.",
 }: Props) {
   const series = useMemo(() => fillSeries(data, from, to), [data, from, to]);
@@ -59,14 +96,7 @@ export default function SpendAreaChart({
   );
 
   if (!hasSpend) {
-    return (
-      <div className="flex h-[18rem] flex-col items-center justify-center gap-1.5 text-center">
-        <p className="text-[13px] font-medium">No spend in this window.</p>
-        {emptyHint ? (
-          <p className="text-[12px] text-muted-foreground">{emptyHint}</p>
-        ) : null}
-      </div>
-    );
+    return <EmptyGraph title={emptyTitle} hint={emptyHint} />;
   }
 
   return (

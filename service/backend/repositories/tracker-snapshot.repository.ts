@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, asc, desc } from "drizzle-orm";
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import TrackerSnapshot from "../models/tracker-snapshot.model";
 
@@ -17,8 +17,10 @@ class TrackerSnapshotRepository {
           monthly_spend: row.monthly_spend,
           weekly_spend: row.weekly_spend,
           balance_usd: row.balance_usd,
+          total_usage_usd: row.total_usage_usd,
           credits_remaining: row.credits_remaining,
           request_count: row.request_count,
+          daily_spend: row.daily_spend,
           updated_at: new Date().toISOString(),
         },
       });
@@ -41,12 +43,63 @@ class TrackerSnapshotRepository {
         monthly_spend: TrackerSnapshot.monthly_spend,
         weekly_spend: TrackerSnapshot.weekly_spend,
         balance_usd: TrackerSnapshot.balance_usd,
+        total_usage_usd: TrackerSnapshot.total_usage_usd,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
+        daily_spend: TrackerSnapshot.daily_spend,
       })
       .from(TrackerSnapshot)
       .where(and(...conditions))
       .orderBy(asc(TrackerSnapshot.ts));
+  }
+
+  static async latestBeforeDay(
+    db: DrizzleD1Database,
+    trackerId: string,
+    day: string,
+  ) {
+    const [row] = await db
+      .select({
+        day: TrackerSnapshot.day,
+        monthly_spend: TrackerSnapshot.monthly_spend,
+        weekly_spend: TrackerSnapshot.weekly_spend,
+        balance_usd: TrackerSnapshot.balance_usd,
+        total_usage_usd: TrackerSnapshot.total_usage_usd,
+        credits_remaining: TrackerSnapshot.credits_remaining,
+        request_count: TrackerSnapshot.request_count,
+      })
+      .from(TrackerSnapshot)
+      .where(
+        and(
+          eq(TrackerSnapshot.tracker_id, trackerId),
+          lt(TrackerSnapshot.day, day),
+        ),
+      )
+      .orderBy(desc(TrackerSnapshot.day))
+      .limit(1);
+    return row;
+  }
+
+  static async latestOnOrBefore(
+    db: DrizzleD1Database,
+    trackerId: string,
+    day: string,
+  ) {
+    const [row] = await db
+      .select({
+        day: TrackerSnapshot.day,
+        total_usage_usd: TrackerSnapshot.total_usage_usd,
+      })
+      .from(TrackerSnapshot)
+      .where(
+        and(
+          eq(TrackerSnapshot.tracker_id, trackerId),
+          lte(TrackerSnapshot.day, day),
+        ),
+      )
+      .orderBy(desc(TrackerSnapshot.day))
+      .limit(1);
+    return row;
   }
 
   static async recentForTenant(
@@ -62,6 +115,7 @@ class TrackerSnapshotRepository {
         monthly_spend: TrackerSnapshot.monthly_spend,
         weekly_spend: TrackerSnapshot.weekly_spend,
         balance_usd: TrackerSnapshot.balance_usd,
+        total_usage_usd: TrackerSnapshot.total_usage_usd,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
       })

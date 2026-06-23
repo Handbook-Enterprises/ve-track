@@ -169,7 +169,7 @@ export default function ProviderDetailSheet({
         </SheetHeader>
 
         {loading && !overview ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="flex min-h-[40vh] items-center justify-center px-4">
             {error ? (
               <p className="max-w-xs text-center text-[12.5px] text-destructive">
                 {error}
@@ -179,9 +179,9 @@ export default function ProviderDetailSheet({
             )}
           </div>
         ) : overview ? (
-          <div className="space-y-6 pt-5">
+          <div className="space-y-6 px-4 pt-5 pb-6">
             <section>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Spend over time · {range.label}
               </p>
               <SpendAreaChart

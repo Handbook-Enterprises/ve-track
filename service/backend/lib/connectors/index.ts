@@ -5,6 +5,7 @@ export interface TrackerResult {
   weeklySpend: number | null;
   creditsRemaining: number | null;
   balanceUsd: number | null;
+  totalUsageUsd: number | null;
   requestCount: number | null;
 }
 
@@ -15,9 +16,14 @@ export interface ValidateResult {
   error?: string;
 }
 
+export interface PullContext {
+  baseTotalUsd: number | null;
+  fromDay: string | null;
+}
+
 export interface ConnectorAdapter {
   validate(key: string): Promise<ValidateResult>;
-  pull(key: string): Promise<TrackerResult>;
+  pull(key: string, ctx?: PullContext): Promise<TrackerResult>;
 }
 
 export const CONNECTOR_PROVIDERS = [
@@ -35,24 +41,26 @@ export const EMPTY_RESULT: TrackerResult = {
   weeklySpend: null,
   creditsRemaining: null,
   balanceUsd: null,
+  totalUsageUsd: null,
   requestCount: null,
 };
 
 const DAY_MS = 86_400_000;
 const CENTS_PER_USD = 100;
 const MICRO_PER_USD = 1_000_000;
-const WEEK_SECONDS = 7 * 24 * 60 * 60;
-const MAX_PAGES = 24;
+const MAX_BACKFILL_PAGES = 200;
+const MAX_BACKFILL_MONTHS = 120;
 
-const monthStartUnix = (): number =>
-  Math.floor(
-    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1) / 1000,
-  );
+const OPENAI_FLOOR_UNIX = Math.floor(
+  Date.parse("2023-12-20T00:00:00Z") / 1000,
+);
+const ANTHROPIC_FLOOR_ISO = "2023-01-01T00:00:00Z";
 
-const monthStartIso = (): string =>
-  new Date(
-    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
-  ).toISOString();
+const nextDayUnix = (day: string): number =>
+  Math.floor((Date.parse(`${day}T00:00:00Z`) + DAY_MS) / 1000);
+
+const nextDayIso = (day: string): string =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + DAY_MS).toISOString();
 
 // ===== OpenAI =====
 
@@ -90,47 +98,52 @@ const openai: ConnectorAdapter = {
     return { ok: true, dedupId, accountRef };
   },
 
-  async pull(key) {
+  async pull(key, ctx) {
+    const startUnix = ctx?.fromDay ? nextDayUnix(ctx.fromDay) : OPENAI_FLOOR_UNIX;
+    const windowSpend = await openaiSum(key, startUnix);
+    return {
+      ...EMPTY_RESULT,
+      totalUsageUsd: (ctx?.baseTotalUsd ?? 0) + windowSpend,
+    };
+  },
+};
+
+async function openaiSum(key: string, startUnix: number): Promise<number> {
+  let total = 0;
+  let page: string | undefined;
+  for (let i = 0; i < MAX_BACKFILL_PAGES; i++) {
     const url = new URL("https://api.openai.com/v1/organization/costs");
-    url.searchParams.set("start_time", String(monthStartUnix()));
+    url.searchParams.set("start_time", String(startUnix));
     url.searchParams.set("bucket_width", "1d");
-    url.searchParams.set("limit", "31");
+    url.searchParams.set("limit", "180");
+    if (page) url.searchParams.set("page", page);
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${key}` },
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("[ve-track][connectors] openai costs failed", res.status, body.slice(0, 300));
+      console.error(
+        "[ve-track][connectors] openai costs failed",
+        res.status,
+        body.slice(0, 300),
+      );
       throw new Error(`OpenAI costs responded ${res.status}`);
     }
     const body: any = await res.json();
-    const weekCutoff = Math.floor(Date.now() / 1000) - WEEK_SECONDS;
-    let monthly = 0;
-    let weekly = 0;
-    let requests = 0;
     for (const bucket of body?.data ?? []) {
-      const bucketStart = Number(bucket?.start_time) || 0;
       const items: any[] = bucket?.result ?? bucket?.results ?? [];
       for (const item of items) {
         if (item?.object === "organization.costs.result") {
           const value = Number(item?.amount?.value);
-          if (Number.isFinite(value)) {
-            monthly += value;
-            if (bucketStart >= weekCutoff) weekly += value;
-          }
+          if (Number.isFinite(value)) total += value;
         }
-        const reqs = Number(item?.num_model_requests);
-        if (Number.isFinite(reqs)) requests += reqs;
       }
     }
-    return {
-      ...EMPTY_RESULT,
-      monthlySpend: monthly,
-      weeklySpend: weekly,
-      requestCount: requests > 0 ? requests : null,
-    };
-  },
-};
+    if (body?.has_more && body?.next_page) page = body.next_page;
+    else break;
+  }
+  return total;
+}
 
 // ===== Anthropic =====
 
@@ -161,44 +174,51 @@ const anthropic: ConnectorAdapter = {
     return { ok: true, dedupId: await sha256Hex(`anthropic:${key}`) };
   },
 
-  async pull(key) {
-    const weekCutoff = Date.now() - WEEK_SECONDS * 1000;
-    let monthly = 0;
-    let weekly = 0;
-    let page: string | undefined;
-    for (let i = 0; i < MAX_PAGES; i++) {
-      const params = new URLSearchParams({
-        starting_at: monthStartIso(),
-        bucket_width: "1d",
-        limit: "31",
-      });
-      params.append("group_by", "description");
-      if (page) params.set("page", page);
-      const res = await fetch(
-        `https://api.anthropic.com/v1/organizations/cost_report?${params.toString()}`,
-        { headers: anthropicHeaders(key) },
-      );
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        console.error("[ve-track][connectors] anthropic cost_report failed", res.status, body.slice(0, 300));
-        throw new Error(`Anthropic cost_report responded ${res.status}`);
-      }
-      const data: any = await res.json();
-      for (const bucket of data?.data ?? []) {
-        const bucketMs = Date.parse(String(bucket?.starting_at ?? "")) || 0;
-        for (const r of bucket?.results ?? []) {
-          const usd = Number(r?.amount ?? 0) / CENTS_PER_USD;
-          if (!usd) continue;
-          monthly += usd;
-          if (bucketMs >= weekCutoff) weekly += usd;
-        }
-      }
-      if (data?.has_more && data?.next_page) page = data.next_page;
-      else break;
-    }
-    return { ...EMPTY_RESULT, monthlySpend: monthly, weeklySpend: weekly };
+  async pull(key, ctx) {
+    const startIso = ctx?.fromDay ? nextDayIso(ctx.fromDay) : ANTHROPIC_FLOOR_ISO;
+    const windowSpend = await anthropicSum(key, startIso);
+    return {
+      ...EMPTY_RESULT,
+      totalUsageUsd: (ctx?.baseTotalUsd ?? 0) + windowSpend,
+    };
   },
 };
+
+async function anthropicSum(key: string, startingAtIso: string): Promise<number> {
+  let total = 0;
+  let page: string | undefined;
+  for (let i = 0; i < MAX_BACKFILL_PAGES; i++) {
+    const params = new URLSearchParams({
+      starting_at: startingAtIso,
+      bucket_width: "1d",
+      limit: "31",
+    });
+    params.append("group_by", "description");
+    if (page) params.set("page", page);
+    const res = await fetch(
+      `https://api.anthropic.com/v1/organizations/cost_report?${params.toString()}`,
+      { headers: anthropicHeaders(key) },
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        "[ve-track][connectors] anthropic cost_report failed",
+        res.status,
+        body.slice(0, 300),
+      );
+      throw new Error(`Anthropic cost_report responded ${res.status}`);
+    }
+    const data: any = await res.json();
+    for (const bucket of data?.data ?? []) {
+      for (const r of bucket?.results ?? []) {
+        total += Number(r?.amount ?? 0) / CENTS_PER_USD;
+      }
+    }
+    if (data?.has_more && data?.next_page) page = data.next_page;
+    else break;
+  }
+  return total;
+}
 
 // ===== OpenRouter =====
 
@@ -226,13 +246,16 @@ const openrouter: ConnectorAdapter = {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("[ve-track][connectors] openrouter credits failed", res.status, body.slice(0, 300));
+      console.error(
+        "[ve-track][connectors] openrouter credits failed",
+        res.status,
+        body.slice(0, 300),
+      );
       throw new Error(`OpenRouter credits responded ${res.status}`);
     }
     const data: any = await res.json();
-    const totalCredits = Number(data?.data?.total_credits ?? 0);
     const totalUsage = Number(data?.data?.total_usage ?? 0);
-    return { ...EMPTY_RESULT, balanceUsd: totalCredits - totalUsage };
+    return { ...EMPTY_RESULT, totalUsageUsd: totalUsage };
   },
 };
 
@@ -265,24 +288,102 @@ const apify: ConnectorAdapter = {
     };
   },
 
-  async pull(key) {
-    const res = await fetch(`${APIFY_BASE}/users/me/limits`, {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error("[ve-track][connectors] apify limits failed", res.status, body.slice(0, 300));
-      throw new Error(`Apify limits responded ${res.status}`);
+  async pull(key, ctx) {
+    if (ctx?.fromDay && ctx.baseTotalUsd != null) {
+      const today = new Date().toISOString().slice(0, 10);
+      const windowSpend = await apifyWindowSpend(key, ctx.fromDay, today);
+      return {
+        ...EMPTY_RESULT,
+        totalUsageUsd: ctx.baseTotalUsd + windowSpend,
+      };
     }
-    const data: any = await res.json();
-    const current = data?.data?.current ?? {};
-    return {
-      ...EMPTY_RESULT,
-      monthlySpend: current?.monthlyUsageUsd ?? null,
-      requestCount: current?.activeActorJobCount ?? null,
-    };
+    return { ...EMPTY_RESULT, totalUsageUsd: await apifyLifetime(key) };
   },
 };
+
+const APIFY_STEP_MS = 28 * DAY_MS;
+
+async function apifyMonthly(
+  key: string,
+  anchorMs: number,
+): Promise<{
+  cycleStart: string;
+  cycleTotal: number;
+  daily: Array<{ date: string; usd: number }>;
+}> {
+  const url = new URL(`${APIFY_BASE}/users/me/usage/monthly`);
+  url.searchParams.set("date", new Date(anchorMs).toISOString().slice(0, 10));
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(
+      "[ve-track][connectors] apify usage/monthly failed",
+      res.status,
+      body.slice(0, 300),
+    );
+    throw new Error(`Apify usage/monthly responded ${res.status}`);
+  }
+  const data: any = await res.json();
+  const d = data?.data ?? {};
+  return {
+    cycleStart: String(d?.usageCycle?.startAt ?? ""),
+    cycleTotal: Number(d?.totalUsageCreditsUsdAfterVolumeDiscount ?? 0),
+    daily: (d?.dailyServiceUsages ?? []).map((x: any) => ({
+      date: String(x?.date ?? "").slice(0, 10),
+      usd: Number(x?.totalUsageCreditsUsd ?? 0),
+    })),
+  };
+}
+
+async function apifyLifetime(key: string): Promise<number> {
+  const me = await fetch(`${APIFY_BASE}/users/me`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  const meData: any = me.ok ? await me.json().catch(() => null) : null;
+  const createdAt = meData?.data?.createdAt;
+  const startMs = createdAt
+    ? Date.parse(createdAt)
+    : Date.now() - 365 * DAY_MS;
+  const now = Date.now();
+  const seen = new Set<string>();
+  let total = 0;
+  let cursor = startMs;
+  for (let i = 0; i < MAX_BACKFILL_MONTHS && cursor <= now; i++) {
+    const { cycleStart, cycleTotal } = await apifyMonthly(key, cursor);
+    if (cycleStart && !seen.has(cycleStart)) {
+      seen.add(cycleStart);
+      total += cycleTotal;
+    }
+    cursor += APIFY_STEP_MS;
+  }
+  return total;
+}
+
+async function apifyWindowSpend(
+  key: string,
+  fromDay: string,
+  today: string,
+): Promise<number> {
+  const now = Date.now();
+  const seenDays = new Set<string>();
+  let total = 0;
+  for (
+    let cursor = Date.parse(`${fromDay}T00:00:00Z`);
+    cursor <= now;
+    cursor += APIFY_STEP_MS
+  ) {
+    const { daily } = await apifyMonthly(key, cursor);
+    for (const d of daily) {
+      if (d.date > fromDay && d.date <= today && !seenDays.has(d.date)) {
+        seenDays.add(d.date);
+        total += d.usd;
+      }
+    }
+  }
+  return total;
+}
 
 // ===== DataForSEO =====
 
@@ -342,22 +443,30 @@ const dataforseo: ConnectorAdapter = {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("[ve-track][connectors] dataforseo user_data failed", res.status, body.slice(0, 300));
+      console.error(
+        "[ve-track][connectors] dataforseo user_data failed",
+        res.status,
+        body.slice(0, 300),
+      );
       throw new Error(`DataForSEO user_data responded ${res.status}`);
     }
     const data: any = await res.json();
     const money = data?.tasks?.[0]?.result?.[0]?.money;
+    const total = money?.total;
     const balance = money?.balance;
-    return {
-      ...EMPTY_RESULT,
-      balanceUsd: balance == null ? null : Number(balance),
-    };
+    const totalUsage =
+      total == null || balance == null
+        ? null
+        : Number(total) - Number(balance);
+    return { ...EMPTY_RESULT, totalUsageUsd: totalUsage };
   },
 };
 
 // ===== Zyte =====
 
 const ZYTE_STATS_URL = "https://zyte-api-stats.zyte.com/api/stats";
+const ZYTE_EPOCH_ISO = "2020-01-01T00:00:00Z";
+const ZYTE_WINDOW_MS = 364 * DAY_MS;
 
 const splitZyteKey = (key: string): { apiKey: string; orgId: string } => {
   const idx = key.lastIndexOf(":");
@@ -385,7 +494,11 @@ async function zyteWindow(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[ve-track][connectors] zyte stats failed", res.status, body.slice(0, 300));
+    console.error(
+      "[ve-track][connectors] zyte stats failed",
+      res.status,
+      body.slice(0, 300),
+    );
     throw new Error(`Zyte stats responded ${res.status}`);
   }
   const data: any = await res.json();
@@ -430,18 +543,21 @@ const zyte: ConnectorAdapter = {
 
   async pull(key) {
     const { apiKey, orgId } = splitZyteKey(key);
-    const end = new Date().toISOString();
-    const weekStart = new Date(Date.now() - WEEK_SECONDS * 1000).toISOString();
-    const [month, week] = await Promise.all([
-      zyteWindow(apiKey, orgId, monthStartIso(), end),
-      zyteWindow(apiKey, orgId, weekStart, end),
-    ]);
-    return {
-      ...EMPTY_RESULT,
-      monthlySpend: month.usd,
-      weeklySpend: week.usd,
-      requestCount: month.requests || null,
-    };
+    const now = Date.now();
+    let usd = 0;
+    let cursor = Date.parse(ZYTE_EPOCH_ISO);
+    for (let i = 0; i < MAX_BACKFILL_MONTHS && cursor < now; i++) {
+      const winEnd = Math.min(cursor + ZYTE_WINDOW_MS, now);
+      const w = await zyteWindow(
+        apiKey,
+        orgId,
+        new Date(cursor).toISOString(),
+        new Date(winEnd).toISOString(),
+      );
+      usd += w.usd;
+      cursor = winEnd;
+    }
+    return { ...EMPTY_RESULT, totalUsageUsd: usd };
   },
 };
 

@@ -1,5 +1,6 @@
 export type MetricKind =
   | "cumulative"
+  | "usage"
   | "balance"
   | "credits"
   | "requests"
@@ -9,6 +10,7 @@ export interface MetricFields {
   monthly_spend?: number | null;
   weekly_spend?: number | null;
   balance_usd?: number | null;
+  total_usage_usd?: number | null;
   credits_remaining?: number | null;
   request_count?: number | null;
 }
@@ -21,21 +23,25 @@ export interface DailySpend {
 export const metricKind = (m: MetricFields): MetricKind =>
   m.monthly_spend != null
     ? "cumulative"
-    : m.balance_usd != null
-      ? "balance"
-      : m.credits_remaining != null
-        ? "credits"
-        : m.request_count != null
-          ? "requests"
-          : "none";
+    : m.total_usage_usd != null
+      ? "usage"
+      : m.balance_usd != null
+        ? "balance"
+        : m.credits_remaining != null
+          ? "credits"
+          : m.request_count != null
+            ? "requests"
+            : "none";
 
 export const isMoneyKind = (kind: MetricKind): boolean =>
-  kind === "cumulative" || kind === "balance";
+  kind === "cumulative" || kind === "usage" || kind === "balance";
 
 export const valueFor = (kind: MetricKind, m: MetricFields): number | null => {
   switch (kind) {
     case "cumulative":
       return m.monthly_spend ?? null;
+    case "usage":
+      return m.total_usage_usd ?? null;
     case "balance":
       return m.balance_usd ?? null;
     case "credits":
@@ -47,14 +53,20 @@ export const valueFor = (kind: MetricKind, m: MetricFields): number | null => {
   }
 };
 
-/**
- * Turn a chronologically ordered series of point-in-time metric snapshots into
- * per-day spend by differencing consecutive snapshots:
- * - cumulative (month-to-date spend): forward diff; a drop means a month reset,
- *   so that day's spend is the new running value.
- * - balance / credits (counts down as you spend): backward diff (prev - current),
- *   clamped at 0 so top-ups never read as negative spend.
- */
+export const dailyDelta = (
+  kind: MetricKind,
+  prev: number | null,
+  current: number | null,
+): number | null => {
+  if (prev == null || current == null) return null;
+  let spend: number;
+  if (kind === "cumulative" || kind === "usage")
+    spend = current >= prev ? current - prev : current;
+  else if (kind === "balance" || kind === "credits") spend = prev - current;
+  else spend = current - prev;
+  return Math.max(0, spend);
+};
+
 export const deriveDailySpend = (
   snapshots: Array<{ day: string } & MetricFields>,
   kind: MetricKind,
@@ -64,13 +76,7 @@ export const deriveDailySpend = (
   for (const s of snapshots) {
     const v = valueFor(kind, s);
     if (v == null) continue;
-    let spend = 0;
-    if (prev != null) {
-      if (kind === "cumulative") spend = v >= prev ? v - prev : v;
-      else if (kind === "balance" || kind === "credits") spend = prev - v;
-      else spend = v - prev;
-    }
-    out.push({ day: s.day, value: Math.max(0, spend) });
+    out.push({ day: s.day, value: dailyDelta(kind, prev, v) ?? 0 });
     prev = v;
   }
   return out;

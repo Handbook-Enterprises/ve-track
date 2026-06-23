@@ -172,7 +172,7 @@ export default function TrackerDetailSheet({
             </SheetHeader>
 
             {loading && !detail ? (
-              <div className="flex min-h-[40vh] items-center justify-center">
+              <div className="flex min-h-[40vh] items-center justify-center px-4">
                 {error ? (
                   <p className="max-w-xs text-center text-[12.5px] text-destructive">
                     {error}
@@ -182,16 +182,17 @@ export default function TrackerDetailSheet({
                 )}
               </div>
             ) : detail ? (
-              <div className="space-y-6 pt-5">
+              <div className="space-y-6 px-4 pt-5 pb-6">
                 <section>
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     {CHART_LABEL[kind]} · {range.label}
                   </p>
                   <SpendAreaChart
                     data={chartData}
                     from={range.from}
                     to={range.to}
-                    emptyHint={null}
+                    emptyTitle="No Spend Yet"
+                    emptyHint="Your daily spend will appear here and record here over time."
                   />
                 </section>
               </div>
