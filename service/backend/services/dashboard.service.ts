@@ -1,8 +1,10 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
+import { ModelRepository } from "../repositories/model.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService from "./usage-event.service";
 import TrackerService from "./tracker.service";
+import SettingsService from "./settings.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
 import type {
@@ -131,6 +133,19 @@ class DashboardService {
     const enrichedByUser = enrich(byUser.groups, users);
     const enrichedByOrg = enrich(byOrg.groups, orgs);
 
+    const settings = await SettingsService.resolve(db, tenantId);
+    let byModelGroups = byModel.groups;
+    if (settings.models_friendly_names) {
+      const models = await ModelRepository.fetchByTenant(db, tenantId);
+      const modelMap = new Map(
+        models.map((m) => [
+          m.model_id,
+          { name: m.name, secondary: m.provider, imageUrl: null },
+        ]),
+      );
+      byModelGroups = enrich(byModel.groups, modelMap);
+    }
+
     return {
       success: true,
       overview: {
@@ -140,7 +155,7 @@ class DashboardService {
         byOrg: enrichedByOrg,
         byUser: enrichedByUser,
         byProvider: byProvider.groups,
-        byModel: byModel.groups,
+        byModel: byModelGroups,
         byAction: byAction.groups,
         series,
       },

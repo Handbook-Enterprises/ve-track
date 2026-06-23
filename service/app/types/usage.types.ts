@@ -50,6 +50,7 @@ export interface UsageQueryFilters {
   to?: number;
   app?: string;
   provider?: string;
+  model?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;

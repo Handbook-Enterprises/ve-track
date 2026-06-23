@@ -10,6 +10,7 @@ interface BaseFilters {
   toTs?: number;
   app?: string;
   provider?: string;
+  model?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;
@@ -25,6 +26,7 @@ const buildWhere = (filters: BaseFilters) => {
     conditions.push(sql`${UsageEvent.timestamp} < ${filters.toTs}`);
   if (filters.app) conditions.push(eq(UsageEvent.app, filters.app));
   if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
+  if (filters.model) conditions.push(eq(UsageEvent.model, filters.model));
   if (filters.clerk_org_id)
     conditions.push(eq(UsageEvent.clerk_org_id, filters.clerk_org_id));
   if (filters.clerk_user_id)

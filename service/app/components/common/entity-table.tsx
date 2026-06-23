@@ -1,15 +1,17 @@
 import { useMemo } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
+import IdentityCell from "./identity-cell";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
-import { providerLabel as labelFor } from "~/utils/providers";
+import type { EntityConfig } from "~/utils/entity-dimensions";
 import type { UsageGroup } from "~/types/usage.types";
 
 interface Props {
-  providers: UsageGroup[];
+  config: EntityConfig;
+  rows: UsageGroup[];
   totalCost: number;
-  onSelect?: (provider: UsageGroup) => void;
+  onSelect?: (row: UsageGroup) => void;
 }
 
 const formatShare = (cost: number, total: number): string => {
@@ -20,17 +22,22 @@ const formatShare = (cost: number, total: number): string => {
   return "<1%";
 };
 
-export default function ProviderTable({ providers, totalCost, onSelect }: Props) {
+export default function EntityTable({
+  config,
+  rows,
+  totalCost,
+  onSelect,
+}: Props) {
   const columns = useMemo<ColumnDef<UsageGroup>[]>(
     () => [
       {
-        id: "provider",
-        accessorFn: (row) => labelFor(row.key).toLowerCase(),
-        header: () => <span>Provider</span>,
+        id: "name",
+        accessorFn: (row) => config.label(row).toLowerCase(),
+        header: () => <span>{config.noun.replace(/^./, (c) => c.toUpperCase())}</span>,
         filterFn: (row, _id, value) => {
           const v = String(value ?? "").toLowerCase();
           if (!v) return true;
-          return labelFor(row.original.key).toLowerCase().includes(v);
+          return config.label(row.original).toLowerCase().includes(v);
         },
         cell: ({ row, table }) => {
           const isTop = table.getSortedRowModel().rows[0]?.id === row.id;
@@ -46,9 +53,20 @@ export default function ProviderTable({ providers, totalCost, onSelect }: Props)
               >
                 {row.index + 1}
               </span>
-              <span className="truncate text-[13.5px] font-semibold">
-                {labelFor(row.original.key)}
-              </span>
+              {config.variant === "identity" ? (
+                <IdentityCell
+                  name={row.original.name}
+                  secondary={row.original.secondary}
+                  fallbackId={row.original.key}
+                  fallbackLabel={config.fallbackLabel}
+                  imageUrl={row.original.imageUrl ?? null}
+                  accent={isTop}
+                />
+              ) : (
+                <span className="truncate text-[13.5px] font-semibold">
+                  {config.label(row.original)}
+                </span>
+              )}
             </div>
           );
         },
@@ -129,23 +147,23 @@ export default function ProviderTable({ providers, totalCost, onSelect }: Props)
         ),
       },
     ],
-    [totalCost],
+    [config, totalCost],
   );
 
   return (
     <DataTable
       columns={columns}
-      data={providers}
+      data={rows}
       initialSorting={[{ id: "cost_usd", desc: true }]}
-      searchColumnId="provider"
-      searchPlaceholder="Filter providers…"
+      searchColumnId="name"
+      searchPlaceholder={`Filter ${config.nounPlural}…`}
       showCount
-      countNoun="providers"
+      countNoun={config.nounPlural}
       accentFirstRowWhenDesc
       onRowClick={onSelect}
       getRowId={(row, idx) => `${row.key ?? "null"}-${idx}`}
-      emptyMessage="No provider spend in this window yet."
-      emptyFilteredMessage={(q) => `No providers match "${q}".`}
+      emptyMessage={`No ${config.noun} spend in this window yet.`}
+      emptyFilteredMessage={(q) => `No ${config.nounPlural} match "${q}".`}
     />
   );
 }

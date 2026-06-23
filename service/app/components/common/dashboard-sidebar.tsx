@@ -1,5 +1,15 @@
 import { Link, useLocation } from "react-router";
-import { Activity, KeyRound, LayoutDashboard, PlugZap } from "lucide-react";
+import {
+  Activity,
+  Building2,
+  Cpu,
+  KeyRound,
+  Layers,
+  LayoutDashboard,
+  PlugZap,
+  Settings,
+  User2,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +29,13 @@ import { useTenantContext } from "~/context/TenantContext";
 const NAV = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "API Keys", url: "/dashboard/keys", icon: KeyRound },
-  { title: "Usage", url: "/dashboard/usage", icon: Activity },
+  { title: "Providers", url: "/dashboard/usage", icon: Activity },
+  { title: "Models", url: "/dashboard/models", icon: Cpu },
+  { title: "Apps", url: "/dashboard/apps", icon: Layers },
+  { title: "People", url: "/dashboard/people", icon: User2 },
+  { title: "Organizations", url: "/dashboard/orgs", icon: Building2 },
   { title: "Trackers", url: "/dashboard/trackers", icon: PlugZap },
+  { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
 export default function DashboardSidebar() {

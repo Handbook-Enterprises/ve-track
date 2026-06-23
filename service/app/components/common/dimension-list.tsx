@@ -10,6 +10,7 @@ interface Props {
   emptyLabel?: string;
   fallbackLabel?: string;
   limit?: number;
+  onSelect?: (group: UsageGroup) => void;
 }
 
 const shareLabel = (cost: number, total: number): string => {
@@ -27,6 +28,7 @@ export default function DimensionList({
   emptyLabel = "Untagged",
   fallbackLabel = "Unknown",
   limit = 12,
+  onSelect,
 }: Props) {
   const rows = groups
     .filter((g) => g.cost_usd > 0 || g.requests > 0)
@@ -45,10 +47,28 @@ export default function DimensionList({
       {rows.map((g, i) => {
         const pct = totalCost > 0 ? (g.cost_usd / totalCost) * 100 : 0;
         const isTop = i === 0;
+        const clickable = onSelect != null && g.key != null;
         return (
           <li
             key={`${g.key ?? "null"}-${i}`}
-            className="flex items-center gap-3 py-3"
+            role={clickable ? "button" : undefined}
+            tabIndex={clickable ? 0 : undefined}
+            onClick={clickable ? () => onSelect(g) : undefined}
+            onKeyDown={
+              clickable
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelect(g);
+                    }
+                  }
+                : undefined
+            }
+            className={cn(
+              "flex items-center gap-3 py-3",
+              clickable &&
+                "-mx-2 cursor-pointer rounded-none px-2 transition-colors hover:bg-primary/[0.05]",
+            )}
           >
             <span
               className={cn(

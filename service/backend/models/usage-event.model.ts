@@ -32,6 +32,7 @@ const UsageEvent = sqliteTable(
     tenantOrg: index("idx_usage_tenant_org").on(t.tenant_id, t.clerk_org_id, t.timestamp),
     tenantUser: index("idx_usage_tenant_user").on(t.tenant_id, t.clerk_user_id, t.timestamp),
     tenantProvider: index("idx_usage_tenant_provider").on(t.tenant_id, t.provider, t.timestamp),
+    tenantModel: index("idx_usage_tenant_model").on(t.tenant_id, t.model, t.timestamp),
     tenantAction: index("idx_usage_tenant_action").on(t.tenant_id, t.action, t.timestamp),
     tenantCorrelation: index("idx_usage_tenant_correlation").on(t.tenant_id, t.correlation_id, t.timestamp),
     tenantAppAction: index("idx_usage_tenant_app_action").on(t.tenant_id, t.app, t.action, t.timestamp),
