@@ -11,6 +11,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   apify: "Apify",
   firecrawl: "Firecrawl",
   brightdata: "BrightData",
+  cloudflare: "Cloudflare",
 };
 
 export const providerLabel = (key: string | null): string => {

@@ -22,6 +22,7 @@ import { Input } from "~/components/ui/input";
 import { ButtonElement } from "~/components/elements";
 import DataForSeoAuthFields from "./DataForSeoAuthFields";
 import ZyteAuthFields from "./ZyteAuthFields";
+import CloudflareAuthFields from "./CloudflareAuthFields";
 import type { TrackerCreatePayload } from "~/types/tracker.types";
 
 const PROVIDERS = [
@@ -61,6 +62,24 @@ const PROVIDERS = [
     keyHint: "Your Stats dashboard API key and organization id",
     placeholder: "Stats dashboard API key",
   },
+  {
+    value: "fal",
+    label: "Fal",
+    keyHint: "Admin API key from your fal dashboard",
+    placeholder: "Paste your fal admin key",
+  },
+  {
+    value: "firecrawl",
+    label: "Firecrawl",
+    keyHint: "API key from your Firecrawl dashboard",
+    placeholder: "fc-…",
+  },
+  {
+    value: "cloudflare",
+    label: "Cloudflare",
+    keyHint: "API token with billing read access and your account id",
+    placeholder: "API token",
+  },
 ] as const;
 
 const schema = z.object({
@@ -83,7 +102,8 @@ export default function ManualConnectForm({ onSubmit, loading }: Props) {
   const selected = PROVIDERS.find((p) => p.value === provider);
   const isDfo = provider === "dataforseo";
   const isZyte = provider === "zyte";
-  const isComposite = isDfo || isZyte;
+  const isCloudflare = provider === "cloudflare";
+  const isComposite = isDfo || isZyte || isCloudflare;
 
   const handleSubmit = async (data: TrackerCreatePayload) => {
     await onSubmit(data);
@@ -146,6 +166,12 @@ export default function ManualConnectForm({ onSubmit, loading }: Props) {
                 />
               ) : isZyte ? (
                 <ZyteAuthFields
+                  onChange={(value) =>
+                    form.setValue("apiKey", value, { shouldValidate: true })
+                  }
+                />
+              ) : isCloudflare ? (
+                <CloudflareAuthFields
                   onChange={(value) =>
                     form.setValue("apiKey", value, { shouldValidate: true })
                   }

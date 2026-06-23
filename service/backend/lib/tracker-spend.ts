@@ -1,6 +1,7 @@
 export type MetricKind =
   | "cumulative"
   | "usage"
+  | "credits_used"
   | "balance"
   | "credits"
   | "requests"
@@ -11,6 +12,7 @@ export interface MetricFields {
   weekly_spend?: number | null;
   balance_usd?: number | null;
   total_usage_usd?: number | null;
+  total_usage_credits?: number | null;
   credits_remaining?: number | null;
   request_count?: number | null;
 }
@@ -25,13 +27,15 @@ export const metricKind = (m: MetricFields): MetricKind =>
     ? "cumulative"
     : m.total_usage_usd != null
       ? "usage"
-      : m.balance_usd != null
-        ? "balance"
-        : m.credits_remaining != null
-          ? "credits"
-          : m.request_count != null
-            ? "requests"
-            : "none";
+      : m.total_usage_credits != null
+        ? "credits_used"
+        : m.balance_usd != null
+          ? "balance"
+          : m.credits_remaining != null
+            ? "credits"
+            : m.request_count != null
+              ? "requests"
+              : "none";
 
 export const isMoneyKind = (kind: MetricKind): boolean =>
   kind === "cumulative" || kind === "usage" || kind === "balance";
@@ -42,6 +46,8 @@ export const valueFor = (kind: MetricKind, m: MetricFields): number | null => {
       return m.monthly_spend ?? null;
     case "usage":
       return m.total_usage_usd ?? null;
+    case "credits_used":
+      return m.total_usage_credits ?? null;
     case "balance":
       return m.balance_usd ?? null;
     case "credits":
@@ -60,7 +66,7 @@ export const dailyDelta = (
 ): number | null => {
   if (prev == null || current == null) return null;
   let spend: number;
-  if (kind === "cumulative" || kind === "usage")
+  if (kind === "cumulative" || kind === "usage" || kind === "credits_used")
     spend = current >= prev ? current - prev : current;
   else if (kind === "balance" || kind === "credits") spend = prev - current;
   else spend = current - prev;

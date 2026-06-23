@@ -7,6 +7,7 @@ export interface TrackerMetrics {
   weekly_spend: number | null;
   balance_usd: number | null;
   total_usage_usd: number | null;
+  total_usage_credits: number | null;
   credits_remaining: number | null;
   request_count: number | null;
 }
@@ -66,6 +67,7 @@ export interface TrackerCostPoint {
 export type TrackerMetricKind =
   | "cumulative"
   | "usage"
+  | "credits_used"
   | "balance"
   | "credits"
   | "requests"

@@ -8,14 +8,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "~/components/ui/chart";
-import { formatMoney } from "~/utils/format";
+import { formatMoney, formatNumber } from "~/utils/format";
 import type { UsageSeriesPoint } from "~/types/usage.types";
 
 const DAY_MS = 86_400_000;
-
-const chartConfig: ChartConfig = {
-  cost_usd: { label: "Spend", color: "var(--chart-1)" },
-};
 
 const toUtcKey = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
@@ -80,6 +76,7 @@ interface Props {
   to: number;
   emptyTitle?: string;
   emptyHint?: string | null;
+  isMoney?: boolean;
 }
 
 export default function SpendAreaChart({
@@ -88,12 +85,18 @@ export default function SpendAreaChart({
   to,
   emptyTitle = "No spend yet",
   emptyHint = "Wire an app's VE_TRACK_KEY and the meter starts here.",
+  isMoney = true,
 }: Props) {
   const series = useMemo(() => fillSeries(data, from, to), [data, from, to]);
   const hasSpend = useMemo(
     () => series.some((p) => p.cost_usd > 0),
     [series],
   );
+  const fmt = (value: number) =>
+    isMoney ? formatMoney(value) : formatNumber(value);
+  const chartConfig: ChartConfig = {
+    cost_usd: { label: isMoney ? "Spend" : "Credits", color: "var(--chart-1)" },
+  };
 
   if (!hasSpend) {
     return <EmptyGraph title={emptyTitle} hint={emptyHint} />;
@@ -122,7 +125,7 @@ export default function SpendAreaChart({
           tickLine={false}
           axisLine={false}
           width={52}
-          tickFormatter={(value: number) => formatMoney(value)}
+          tickFormatter={(value: number) => fmt(value)}
           className="text-[11px]"
         />
         <ChartTooltip
@@ -132,7 +135,7 @@ export default function SpendAreaChart({
               labelFormatter={(value) => format(parseISO(String(value)), "EEE, MMM d")}
               formatter={(value) => (
                 <span className="font-mono tabular-nums">
-                  {formatMoney(Number(value))}
+                  {fmt(Number(value))}
                 </span>
               )}
             />

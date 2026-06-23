@@ -38,6 +38,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   apify: "Apify",
   dataforseo: "DataForSEO",
   zyte: "Zyte",
+  fal: "Fal",
+  firecrawl: "Firecrawl",
+  cloudflare: "Cloudflare",
 };
 
 const labelFor = (provider: string): string =>
@@ -77,12 +80,14 @@ const round6 = (n: number | null): number | null =>
 const primaryValue = (m: {
   monthly_spend?: number | null;
   total_usage_usd?: number | null;
+  total_usage_credits?: number | null;
   balance_usd?: number | null;
   credits_remaining?: number | null;
   request_count?: number | null;
 }): number =>
   m.monthly_spend ??
   m.total_usage_usd ??
+  m.total_usage_credits ??
   m.balance_usd ??
   m.credits_remaining ??
   m.request_count ??
@@ -93,6 +98,7 @@ const metricColumns = (r: TrackerResult) => ({
   weekly_spend: round6(r.weeklySpend),
   balance_usd: round6(r.balanceUsd),
   total_usage_usd: round6(r.totalUsageUsd),
+  total_usage_credits: round6(r.totalUsageCredits),
   credits_remaining: r.creditsRemaining,
   request_count: r.requestCount,
 });
@@ -110,6 +116,7 @@ const publicTracker = (t: any) => ({
   weekly_spend: t.weekly_spend ?? null,
   balance_usd: t.balance_usd ?? null,
   total_usage_usd: t.total_usage_usd ?? null,
+  total_usage_credits: t.total_usage_credits ?? null,
   credits_remaining: t.credits_remaining ?? null,
   request_count: t.request_count ?? null,
   window_spend: 0,
@@ -259,10 +266,11 @@ class TrackerService {
       to,
     );
 
+    const usesDaily = kind === "usage" || kind === "credits_used";
     const series = snapshots
       .map((s) => ({
         day: s.day,
-        value: kind === "usage" ? s.daily_spend ?? null : valueFor(kind, s),
+        value: usesDaily ? s.daily_spend ?? null : valueFor(kind, s),
       }))
       .filter((p): p is { day: string; value: number } => p.value != null);
 
@@ -275,6 +283,7 @@ class TrackerService {
           weekly_spend: tracker.weekly_spend ?? null,
           balance_usd: tracker.balance_usd ?? null,
           total_usage_usd: tracker.total_usage_usd ?? null,
+          total_usage_credits: tracker.total_usage_credits ?? null,
           credits_remaining: tracker.credits_remaining ?? null,
           request_count: tracker.request_count ?? null,
         },
@@ -385,7 +394,20 @@ class TrackerService {
         baseTotalUsd: base?.total_usage_usd ?? null,
         fromDay: base?.total_usage_usd != null ? base.day : null,
       });
-      const metrics = metricColumns(result);
+      let metrics = metricColumns(result);
+      if (
+        metrics.balance_usd != null &&
+        metrics.total_usage_usd == null &&
+        metrics.total_usage_credits == null
+      ) {
+        const prevBalance = previous?.balance_usd ?? null;
+        const prevTotal = previous?.total_usage_usd ?? 0;
+        const delta =
+          prevBalance == null
+            ? 0
+            : Math.max(0, prevBalance - metrics.balance_usd);
+        metrics = { ...metrics, total_usage_usd: round6(prevTotal + delta) };
+      }
       const kind = metricKind(metrics);
       const daily_spend = dailyDelta(
         kind,

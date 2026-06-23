@@ -18,6 +18,7 @@ class TrackerSnapshotRepository {
           weekly_spend: row.weekly_spend,
           balance_usd: row.balance_usd,
           total_usage_usd: row.total_usage_usd,
+          total_usage_credits: row.total_usage_credits,
           credits_remaining: row.credits_remaining,
           request_count: row.request_count,
           daily_spend: row.daily_spend,
@@ -44,6 +45,7 @@ class TrackerSnapshotRepository {
         weekly_spend: TrackerSnapshot.weekly_spend,
         balance_usd: TrackerSnapshot.balance_usd,
         total_usage_usd: TrackerSnapshot.total_usage_usd,
+        total_usage_credits: TrackerSnapshot.total_usage_credits,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
         daily_spend: TrackerSnapshot.daily_spend,
@@ -65,6 +67,7 @@ class TrackerSnapshotRepository {
         weekly_spend: TrackerSnapshot.weekly_spend,
         balance_usd: TrackerSnapshot.balance_usd,
         total_usage_usd: TrackerSnapshot.total_usage_usd,
+        total_usage_credits: TrackerSnapshot.total_usage_credits,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
       })
@@ -116,6 +119,7 @@ class TrackerSnapshotRepository {
         weekly_spend: TrackerSnapshot.weekly_spend,
         balance_usd: TrackerSnapshot.balance_usd,
         total_usage_usd: TrackerSnapshot.total_usage_usd,
+        total_usage_credits: TrackerSnapshot.total_usage_credits,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
       })
