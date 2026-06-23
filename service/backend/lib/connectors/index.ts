@@ -6,6 +6,7 @@ export interface TrackerResult {
   creditsRemaining: number | null;
   balanceUsd: number | null;
   totalUsageUsd: number | null;
+  totalUsageCredits: number | null;
   requestCount: number | null;
 }
 
@@ -33,6 +34,9 @@ export const CONNECTOR_PROVIDERS = [
   "apify",
   "dataforseo",
   "zyte",
+  "fal",
+  "firecrawl",
+  "cloudflare",
 ] as const;
 export type ConnectorProvider = (typeof CONNECTOR_PROVIDERS)[number];
 
@@ -42,6 +46,7 @@ export const EMPTY_RESULT: TrackerResult = {
   creditsRemaining: null,
   balanceUsd: null,
   totalUsageUsd: null,
+  totalUsageCredits: null,
   requestCount: null,
 };
 
@@ -561,6 +566,195 @@ const zyte: ConnectorAdapter = {
   },
 };
 
+// ===== Fal =====
+
+const FAL_BILLING_URL = "https://api.fal.ai/v1/account/billing?expand=credits";
+
+const falAuth = (key: string): string => `Key ${key}`;
+
+const fal: ConnectorAdapter = {
+  async validate(key) {
+    const res = await fetch(FAL_BILLING_URL, {
+      headers: { Authorization: falAuth(key) },
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        dedupId: null,
+        error:
+          res.status === 401 || res.status === 403
+            ? "Fal rejected this key. Use an Admin API key from your fal dashboard."
+            : `Fal rejected the key (${res.status}).`,
+      };
+    }
+    const data: any = await res.json().catch(() => null);
+    const username = data?.username ?? null;
+    return {
+      ok: true,
+      dedupId: username ?? (await sha256Hex(`fal:${key}`)),
+      accountRef: username,
+    };
+  },
+
+  async pull(key) {
+    const res = await fetch(FAL_BILLING_URL, {
+      headers: { Authorization: falAuth(key) },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        "[ve-track][connectors] fal billing failed",
+        res.status,
+        body.slice(0, 300),
+      );
+      throw new Error(`Fal billing responded ${res.status}`);
+    }
+    const data: any = await res.json();
+    const balance = data?.credits?.current_balance;
+    return {
+      ...EMPTY_RESULT,
+      balanceUsd: balance == null ? null : Number(balance),
+    };
+  },
+};
+
+// ===== Firecrawl =====
+
+const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
+
+const fcAuth = (key: string): string => `Bearer ${key}`;
+
+const firecrawl: ConnectorAdapter = {
+  async validate(key) {
+    const res = await fetch(`${FIRECRAWL_BASE}/team/credit-usage`, {
+      headers: { Authorization: fcAuth(key) },
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        dedupId: null,
+        error:
+          res.status === 401 || res.status === 402 || res.status === 403
+            ? "Firecrawl rejected this key. Use your API key from the Firecrawl dashboard."
+            : `Firecrawl rejected the key (${res.status}).`,
+      };
+    }
+    return { ok: true, dedupId: await sha256Hex(`firecrawl:${key}`) };
+  },
+
+  async pull(key) {
+    const res = await fetch(
+      `${FIRECRAWL_BASE}/team/credit-usage/historical`,
+      { headers: { Authorization: fcAuth(key) } },
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        "[ve-track][connectors] firecrawl historical failed",
+        res.status,
+        body.slice(0, 300),
+      );
+      throw new Error(`Firecrawl credit-usage responded ${res.status}`);
+    }
+    const data: any = await res.json();
+    let used = 0;
+    for (const p of data?.periods ?? []) used += Number(p?.totalCredits ?? 0);
+    return { ...EMPTY_RESULT, totalUsageCredits: used };
+  },
+};
+
+// ===== Cloudflare =====
+
+const CLOUDFLARE_BASE = "https://api.cloudflare.com/client/v4";
+const CLOUDFLARE_EPOCH_ISO = "2021-01-01T00:00:00Z";
+const CLOUDFLARE_WINDOW_MS = 364 * DAY_MS;
+
+const splitCloudflareKey = (
+  key: string,
+): { token: string; accountId: string } => {
+  const idx = key.lastIndexOf(":");
+  return {
+    token: idx === -1 ? key : key.slice(0, idx),
+    accountId: idx === -1 ? "" : key.slice(idx + 1),
+  };
+};
+
+async function cloudflareWindow(
+  token: string,
+  accountId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<number> {
+  const url = new URL(`${CLOUDFLARE_BASE}/accounts/${accountId}/paygo-usage`);
+  url.searchParams.set("from", fromIso);
+  url.searchParams.set("to", toIso);
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(
+      "[ve-track][connectors] cloudflare paygo-usage failed",
+      res.status,
+      body.slice(0, 300),
+    );
+    throw new Error(`Cloudflare paygo-usage responded ${res.status}`);
+  }
+  const data: any = await res.json();
+  let usd = 0;
+  for (const r of data?.result ?? []) usd += Number(r?.ContractedCost ?? 0);
+  return usd;
+}
+
+const cloudflare: ConnectorAdapter = {
+  async validate(key) {
+    const { token, accountId } = splitCloudflareKey(key);
+    if (!accountId) {
+      return {
+        ok: false,
+        dedupId: null,
+        error: "Paste your Cloudflare key as apiToken:accountId.",
+      };
+    }
+    const res = await fetch(
+      `${CLOUDFLARE_BASE}/accounts/${accountId}/paygo-usage`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      let error = `Cloudflare rejected the key (${res.status}).`;
+      if (res.status === 401 || res.status === 403)
+        error =
+          "Cloudflare rejected this key. Use an API token with billing read access, and confirm the account is enrolled in the PayGo usage alpha.";
+      else if (res.status === 404)
+        error = "Cloudflare could not find this account id.";
+      return { ok: false, dedupId: null, error };
+    }
+    return {
+      ok: true,
+      dedupId: await sha256Hex(`cloudflare:${accountId}`),
+      accountRef: `account ${accountId}`,
+    };
+  },
+
+  async pull(key) {
+    const { token, accountId } = splitCloudflareKey(key);
+    const now = Date.now();
+    let usd = 0;
+    let cursor = Date.parse(CLOUDFLARE_EPOCH_ISO);
+    for (let i = 0; i < MAX_BACKFILL_MONTHS && cursor < now; i++) {
+      const winEnd = Math.min(cursor + CLOUDFLARE_WINDOW_MS, now);
+      usd += await cloudflareWindow(
+        token,
+        accountId,
+        new Date(cursor).toISOString(),
+        new Date(winEnd).toISOString(),
+      );
+      cursor = winEnd;
+    }
+    return { ...EMPTY_RESULT, totalUsageUsd: usd };
+  },
+};
+
 const ADAPTERS: Record<ConnectorProvider, ConnectorAdapter> = {
   openai,
   anthropic,
@@ -568,6 +762,9 @@ const ADAPTERS: Record<ConnectorProvider, ConnectorAdapter> = {
   apify,
   dataforseo,
   zyte,
+  fal,
+  firecrawl,
+  cloudflare,
 };
 
 export const getAdapter = (provider: string): ConnectorAdapter | null =>

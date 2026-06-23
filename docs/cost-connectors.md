@@ -1,6 +1,6 @@
 # Cost Connectors — connecting provider accounts for ground-truth cost
 
-Status: Phase 0 + Phase 1 + Phase 2 shipped. All six connectors (OpenAI, Anthropic, OpenRouter, Apify, DataForSEO, Zyte) now report a lifetime **Total Spend** with a stored per-day difference (see "Cost model v2" → "Total Spend providers"). Owner: Sylvester. Last updated: 2026-06-23.
+Status: Phase 0 + Phase 1 + Phase 2 shipped. Nine connectors live: OpenAI, Anthropic, OpenRouter, Apify, DataForSEO, Zyte, Fal, Firecrawl, Cloudflare. All report a **Total Spend** (USD) with a stored per-day difference, except Firecrawl which reports **Total Credits used** (credits, not USD) and Fal which is **since-connected** USD. Serper and Cloro are parked (no usable account API). See "Cost model v2" → "Total Spend providers". Owner: Sylvester. Last updated: 2026-06-23.
 
 This is the plan for tracking spend from people who use provider APIs **directly** (scripting, notebooks, non ve-app work) and never touch the `@viewengine/track` package. The package keeps doing per-request attribution for ve-apps; this adds a second, parallel path: **connect a provider account once, we pull the actual cost from the provider on a schedule.**
 
@@ -38,15 +38,17 @@ What each supported provider exposes to a connected key, the auth it needs, the 
 | OpenAI | Total Spend | `/v1/organization/costs` (lifetime daily sum from 2023-12-20, paged); `/v1/me` for org id | **Admin** `sk-admin-…` | org id (`org-…`) | 1 |
 | Anthropic | Total Spend | `/v1/organizations/cost_report` (lifetime daily sum, cents→USD, paged) | **Admin** `sk-ant-admin…` (org accounts only) | org (key is org-scoped) | 1 |
 | OpenRouter | Total Spend | `/api/v1/credits` (`total_usage`) | **Provisioning** (management) key | hash of key | 2 ✅ |
-| Fal | usage + invoice | `/account/focus` (invoice or estimate), usage-by-model | **Admin** key | workspace/account | 2 |
+| Fal | Total Spend (since connected) | `/account/billing?expand=credits` (`current_balance`, diffed into a running total) | **Admin** key (`Key …`) | username | 2 ✅ |
 | Apify | Total Spend | `/v2/users/me/usage/monthly` (sum cycles to `createdAt`; `dailyServiceUsages` for window); `/v2/users/me` for user id + createdAt | API token (Bearer) | user id | 2 ✅ |
 | DataForSEO | Total Spend | `/v3/appendix/user_data` (`money.total − money.balance`) | login/password or Base64 key (basic) | account login | 2 ✅ |
 | Zyte | Total Spend | `zyte-api-stats.zyte.com/api/stats` (lifetime window, `cost_microusd_total` / 1e6) | Stats dashboard API key (basic) + org id | organization id | 2 ✅ |
+| Firecrawl | Total Credits used | `/v2/team/credit-usage/historical` (sum `periods[].totalCredits`) | API key (Bearer) | hash of key | 2 ✅ |
+| Cloudflare | Total Spend (alpha) | `/accounts/{id}/paygo-usage` (sum `ContractedCost` over ≤364-day windows) | API token (Bearer) + account id | account id | 2 ✅ (alpha/restricted) |
 | BrightData | ⚠️ balance only | `/customer/balance` (balance + pending) | Bearer token | customer/account | none (poll balance, diff over time) | 3 |
-| Firecrawl | ⚠️ remaining tokens | `/v2/team/token-usage` (remaining, billing period) | API key | team/org | none (delta over time) | 3 |
 | Perplexity | ❌ no public cost API | dashboard only (by model, by key) | — | — | fallback: SDK per-request cost or manual import | 3 |
 | Gemini (Google) | ❌ no per-key cost API | Cloud Billing → BigQuery export | GCP service account | billing account / project | project labels | 3 |
-| Cloro | ❓ no public usage API found | — | — | — | fallback: SDK per-request credits | 3 |
+| Serper | ❌ no public account/billing API | dashboard only (credits used, 24h/30d) | — | — | parked; possible undocumented `/account` route (unverified) | parked |
+| Cloro | ❌ no account API | credits only inline per request (`X-Credits-Charged`) | — | — | parked; SDK-side accumulation only | parked |
 
 Legend: ✅ historical cost reachable · ⚠️ point-in-time only (balance/remaining → derive spend by diffing snapshots) · ❌ no usable API (fallback to SDK capture or manual/CSV import).
 
@@ -86,15 +88,22 @@ Each adapter exposes `validate(key)` (connect/dedup) and a single **`pull(key): 
 | OpenRouter | `/api/v1/credits` | Total Spend (`total_usage`) |
 | Apify | `/v2/users/me/usage/monthly` (sum cycles + daily window) | Total Spend |
 | DataForSEO | `/v3/appendix/user_data` | Total Spend (`money.total − money.balance`) |
-| Zyte | `/api/stats` (lifetime window, no `groupby_time`) | Total Spend (`cost_microusd_total` / 1e6) |
+| Zyte | `/api/stats` (≤364-day windows) | Total Spend (`cost_microusd_total` / 1e6) |
+| Fal | `/account/billing?expand=credits` | Total Spend since connected (balance diffed) |
+| Firecrawl | `/v2/team/credit-usage/historical` | Total Credits used (`credits_used` kind, non-money) |
+| Cloudflare | `/accounts/{id}/paygo-usage` (≤364-day windows) | Total Spend (`ContractedCost`), alpha/restricted |
 
 The UI picks the primary metric by priority (monthlySpend → totalUsageUsd → balanceUsd → creditsRemaining → requestCount) via `app/utils/tracker-metric.ts`, shared by the provider card and the detail sheet; accounts of one provider share a metric type, so the provider total sums them.
 
 **Total Spend providers (`usage` kind).** All six connectors report a monotonically increasing lifetime spend (`total_usage_usd`) and render as **Total Spend** (headline) plus **Spend per day** (chart). The per-day figure is the day-over-day difference of `total_usage_usd`, computed and stored at sync time in `tracker_snapshots.daily_spend`, so each day's actual spend is queryable without recomputation.
 
-Two sourcing strategies, both returning `totalUsageUsd`:
-- **Single-call exact lifetime:** OpenRouter (`total_usage`), DataForSEO (`money.total − money.balance`), Zyte (sum of `cost_microusd_total` over ≤364-day windows, since the stats API rejects ranges ≥366 days).
-- **Backfill once, then trailing-window incremental:** OpenAI, Anthropic, Apify. `sync()` passes a `PullContext { baseTotalUsd, fromDay }` derived from a finalized prior snapshot (the latest on/before `today − 10d`, falling back to the latest before today). With a base, the adapter fetches only spend after `fromDay` and returns `baseTotalUsd + window`; with no base (first sync) it pages the full history from the provider floor (OpenAI `2023-12-20`, Anthropic `2023-01-01`, Apify account `createdAt`). The 10-day overlap re-fetches recent days each sync so late-finalizing costs self-correct.
+Sourcing strategies:
+- **Single-call exact lifetime (USD):** OpenRouter (`total_usage`), DataForSEO (`money.total − money.balance`), Zyte (sum of `cost_microusd_total` over ≤364-day windows, since the stats API rejects ranges ≥366 days), Cloudflare (sum `ContractedCost` over ≤364-day windows; **alpha + access-restricted**, errors if the account isn't allowlisted).
+- **Backfill once, then trailing-window incremental (USD):** OpenAI, Anthropic, Apify. `sync()` passes a `PullContext { baseTotalUsd, fromDay }` derived from a finalized prior snapshot (the latest on/before `today − 10d`, falling back to the latest before today). With a base, the adapter fetches only spend after `fromDay` and returns `baseTotalUsd + window`; with no base (first sync) it pages the full history from the provider floor (OpenAI `2023-12-20`, Anthropic `2023-01-01`, Apify account `createdAt`). The 10-day overlap re-fetches recent days each sync so late-finalizing costs self-correct.
+- **Balance accumulator (USD, since connected):** Fal exposes only `current_balance`. `sync()` converts a balance-only result into a running `total_usage_usd` by adding `max(0, prevBalance − currBalance)` each pull (top-ups read as 0, never negative). Starts at $0 on connect, so it is **since-connected**, not true lifetime.
+- **Credits, not dollars (`credits_used` kind):** Firecrawl exposes credits with no USD field. We sum the historical endpoint's `periods[].totalCredits` into `total_usage_credits` and render **Total Credits** + **Credits per day** (`isMoney = false`; the chart formats as plain numbers). No daily granularity from Firecrawl, so the per-day figure comes from our snapshot differencing.
+
+**Parked (no usable account API):** Serper (dashboard-only; a `/account` route may exist but is undocumented/unverified) and Cloro (credits only reported inline per request via `X-Credits-Charged`). Neither can be a scheduled connector pull today.
 
 **Storage + history (`0020_tracker_metric_snapshots.sql`, `0021_tracker_total_usage.sql`, `0022_tracker_daily_spend.sql`).** The latest metrics live on the `trackers` row (`monthly_spend`, `weekly_spend`, `balance_usd`, `total_usage_usd`, `credits_remaining`, `request_count`). A daily snapshot of those metrics — plus the derived `daily_spend` — is written to the **`tracker_snapshots`** table (one row per tracker per day, id `<trackerId>_<day>`, upsert), which powers the trend chart.
 

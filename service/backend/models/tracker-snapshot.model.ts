@@ -13,6 +13,7 @@ const TrackerSnapshot = sqliteTable(
     weekly_spend: real(),
     balance_usd: real(),
     total_usage_usd: real(),
+    total_usage_credits: real(),
     credits_remaining: real(),
     request_count: integer(),
     daily_spend: real(),

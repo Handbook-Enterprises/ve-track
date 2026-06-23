@@ -16,6 +16,7 @@ import {
   CHART_LABEL,
   formatMetric,
   headlineMetrics,
+  isMoneyKind,
   metricKind,
 } from "~/utils/tracker-metric";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
@@ -191,6 +192,7 @@ export default function TrackerDetailSheet({
                     data={chartData}
                     from={range.from}
                     to={range.to}
+                    isMoney={isMoneyKind(kind)}
                     emptyTitle="No Spend Yet"
                     emptyHint="Your daily spend will appear here and record here over time."
                   />

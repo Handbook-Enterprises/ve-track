@@ -13,6 +13,7 @@ import { Input } from "~/components/ui/input";
 import { ButtonElement } from "~/components/elements";
 import DataForSeoAuthFields from "./DataForSeoAuthFields";
 import ZyteAuthFields from "./ZyteAuthFields";
+import CloudflareAuthFields from "./CloudflareAuthFields";
 import { providerLabel } from "~/utils/providers";
 import type { Tracker } from "~/types/tracker.types";
 
@@ -23,6 +24,9 @@ const PLACEHOLDERS: Record<string, string> = {
   apify: "apify_api_…",
   dataforseo: "API key or login:password",
   zyte: "apiKey:organizationId",
+  fal: "Paste your fal admin key",
+  firecrawl: "fc-…",
+  cloudflare: "apiToken:accountId",
 };
 
 interface Props {
@@ -49,7 +53,8 @@ export default function EditKeyDialog({
   const [submitting, setSubmitting] = useState(false);
   const isDfo = account.provider === "dataforseo";
   const isZyte = account.provider === "zyte";
-  const isComposite = isDfo || isZyte;
+  const isCloudflare = account.provider === "cloudflare";
+  const isComposite = isDfo || isZyte || isCloudflare;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +112,8 @@ export default function EditKeyDialog({
               <DataForSeoAuthFields autoFocus hideHint onChange={setApiKey} />
             ) : isZyte ? (
               <ZyteAuthFields autoFocus hideHint onChange={setApiKey} />
+            ) : isCloudflare ? (
+              <CloudflareAuthFields autoFocus hideHint onChange={setApiKey} />
             ) : (
               <Input
                 autoFocus
