@@ -17,6 +17,7 @@ const PUBLIC_COLUMNS = {
   monthly_spend: Tracker.monthly_spend,
   weekly_spend: Tracker.weekly_spend,
   balance_usd: Tracker.balance_usd,
+  total_usage_usd: Tracker.total_usage_usd,
   credits_remaining: Tracker.credits_remaining,
   request_count: Tracker.request_count,
   created_at: Tracker.created_at,

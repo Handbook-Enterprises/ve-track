@@ -12,6 +12,7 @@ import {
   metricKind,
   isMoneyKind,
   valueFor,
+  dailyDelta,
 } from "../lib/tracker-spend";
 import {
   sealApiKey,
@@ -68,17 +69,20 @@ const buildKeyAlertHtml = (provider: string, accountRef: string): string => {
 };
 
 const DAY_MS = 86_400_000;
+const LIFETIME_OVERLAP_DAYS = 10;
 
 const round6 = (n: number | null): number | null =>
   n == null ? null : Math.round(n * 1_000_000) / 1_000_000;
 
 const primaryValue = (m: {
   monthly_spend?: number | null;
+  total_usage_usd?: number | null;
   balance_usd?: number | null;
   credits_remaining?: number | null;
   request_count?: number | null;
 }): number =>
   m.monthly_spend ??
+  m.total_usage_usd ??
   m.balance_usd ??
   m.credits_remaining ??
   m.request_count ??
@@ -88,6 +92,7 @@ const metricColumns = (r: TrackerResult) => ({
   monthly_spend: round6(r.monthlySpend),
   weekly_spend: round6(r.weeklySpend),
   balance_usd: round6(r.balanceUsd),
+  total_usage_usd: round6(r.totalUsageUsd),
   credits_remaining: r.creditsRemaining,
   request_count: r.requestCount,
 });
@@ -104,6 +109,7 @@ const publicTracker = (t: any) => ({
   monthly_spend: t.monthly_spend ?? null,
   weekly_spend: t.weekly_spend ?? null,
   balance_usd: t.balance_usd ?? null,
+  total_usage_usd: t.total_usage_usd ?? null,
   credits_remaining: t.credits_remaining ?? null,
   request_count: t.request_count ?? null,
   window_spend: 0,
@@ -254,7 +260,10 @@ class TrackerService {
     );
 
     const series = snapshots
-      .map((s) => ({ day: s.day, value: valueFor(kind, s) }))
+      .map((s) => ({
+        day: s.day,
+        value: kind === "usage" ? s.daily_spend ?? null : valueFor(kind, s),
+      }))
       .filter((p): p is { day: string; value: number } => p.value != null);
 
     return {
@@ -265,6 +274,7 @@ class TrackerService {
           monthly_spend: tracker.monthly_spend ?? null,
           weekly_spend: tracker.weekly_spend ?? null,
           balance_usd: tracker.balance_usd ?? null,
+          total_usage_usd: tracker.total_usage_usd ?? null,
           credits_remaining: tracker.credits_remaining ?? null,
           request_count: tracker.request_count ?? null,
         },
@@ -354,11 +364,34 @@ class TrackerService {
 
     const now = Date.now();
     const today = new Date(now).toISOString().slice(0, 10);
+    const cutoff = new Date(now - LIFETIME_OVERLAP_DAYS * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
 
     try {
       const key = await openApiKey(secret, tracker.tenant_id, tracker);
-      const result = await adapter.pull(key);
+      const previous = await TrackerSnapshotRepository.latestBeforeDay(
+        db,
+        tracker.id,
+        today,
+      );
+      const baseOld = await TrackerSnapshotRepository.latestOnOrBefore(
+        db,
+        tracker.id,
+        cutoff,
+      );
+      const base = baseOld ?? previous;
+      const result = await adapter.pull(key, {
+        baseTotalUsd: base?.total_usage_usd ?? null,
+        fromDay: base?.total_usage_usd != null ? base.day : null,
+      });
       const metrics = metricColumns(result);
+      const kind = metricKind(metrics);
+      const daily_spend = dailyDelta(
+        kind,
+        previous ? valueFor(kind, previous) : null,
+        valueFor(kind, metrics),
+      );
 
       await TrackerSnapshotRepository.upsert(db, {
         id: `${tracker.id}_${today}`,
@@ -367,6 +400,7 @@ class TrackerService {
         day: today,
         ts: Date.parse(`${today}T00:00:00Z`),
         ...metrics,
+        daily_spend,
       });
 
       await TrackerRepository.update(db, id, {
