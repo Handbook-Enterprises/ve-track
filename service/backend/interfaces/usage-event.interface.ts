@@ -30,6 +30,7 @@ export interface UsageQuery {
   to?: string;
   app?: string;
   provider?: string;
+  model?: string;
   clerk_org_id?: string;
   clerk_user_id?: string;
   action?: string;

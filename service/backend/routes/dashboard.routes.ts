@@ -28,6 +28,8 @@ dashboardRouter.get("/trackers/:id/costs", DashboardController.trackerCostsContr
 dashboardRouter.patch("/trackers/:id", DashboardController.updateTrackerController);
 dashboardRouter.get("/overview", DashboardController.overviewController);
 dashboardRouter.post("/canary", DashboardController.canaryController);
+dashboardRouter.get("/settings", DashboardController.settingsController);
+dashboardRouter.patch("/settings", DashboardController.updateSettingsController);
 
 dashboardRouter.route("/apps", appsRouter);
 dashboardRouter.route("/actions", actionsRouter);

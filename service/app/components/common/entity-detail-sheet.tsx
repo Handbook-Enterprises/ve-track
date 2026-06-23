@@ -14,44 +14,24 @@ import SpendAreaChart from "./spend-area-chart";
 import DimensionList from "./dimension-list";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
-import { providerLabel } from "~/utils/providers";
+import {
+  DIMENSIONS,
+  isEntityId,
+  type EntityConfig,
+  type EntityId,
+} from "~/utils/entity-dimensions";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type { UsageGroup, UsageOverview } from "~/types/usage.types";
 
 interface Props {
-  provider: string | null;
+  config: EntityConfig;
+  entity: UsageGroup | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialRange: DateRange;
   initialPresetId: RangePresetId | null;
+  onDrill?: (entityId: EntityId, group: UsageGroup) => void;
 }
-
-const TABS: Array<{
-  id: string;
-  label: string;
-  pick: (o: UsageOverview) => UsageGroup[];
-  variant?: "plain" | "identity";
-  emptyLabel?: string;
-  fallbackLabel?: string;
-}> = [
-  { id: "models", label: "Models", pick: (o) => o.byModel, emptyLabel: "Unknown" },
-  { id: "actions", label: "Actions", pick: (o) => o.byAction, emptyLabel: "Untagged" },
-  { id: "apps", label: "Apps", pick: (o) => o.byApp, emptyLabel: "Unattributed" },
-  {
-    id: "people",
-    label: "People",
-    pick: (o) => o.byUser,
-    variant: "identity",
-    fallbackLabel: "Anonymous",
-  },
-  {
-    id: "orgs",
-    label: "Organizations",
-    pick: (o) => o.byOrg,
-    variant: "identity",
-    fallbackLabel: "Personal / no org",
-  },
-];
 
 function HeadlineStat({
   label,
@@ -79,12 +59,14 @@ function HeadlineStat({
   );
 }
 
-export default function ProviderDetailSheet({
-  provider,
+export default function EntityDetailSheet({
+  config,
+  entity,
   open,
   onOpenChange,
   initialRange,
   initialPresetId,
+  onDrill,
 }: Props) {
   const { authFetch } = useAuthContext();
   const [range, setRange] = useState<DateRange>(initialRange);
@@ -100,15 +82,15 @@ export default function ProviderDetailSheet({
       setRange(initialRange);
       setActivePresetId(initialPresetId);
     }
-  }, [open, provider]);
+  }, [open, entity?.key, config.id]);
 
   useEffect(() => {
-    if (!open || !provider) return;
+    if (!open || !entity?.key) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     UsageService.getOverview(authFetch, {
-      provider,
+      [config.filterKey]: entity.key,
       from: range.from,
       to: range.to,
     })
@@ -125,12 +107,14 @@ export default function ProviderDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, provider, range.from, range.to, authFetch]);
+  }, [open, entity?.key, config.filterKey, range.from, range.to, authFetch]);
 
   const totals = overview?.totals;
   const cost = totals?.cost_usd ?? 0;
   const calls = totals?.requests ?? 0;
   const avg = calls > 0 ? cost / calls : 0;
+  const title = entity ? config.label(entity) : "";
+  const tabs = config.related.map((id) => DIMENSIONS[id]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -139,10 +123,10 @@ export default function ProviderDetailSheet({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                Provider
+                {config.noun.replace(/^./, (c) => c.toUpperCase())}
               </p>
               <SheetTitle className="text-[24px] font-bold leading-tight tracking-tight">
-                {providerLabel(provider)}
+                {title}
               </SheetTitle>
             </div>
             <DateRangePicker
@@ -191,15 +175,15 @@ export default function ProviderDetailSheet({
               />
             </section>
 
-            <Tabs defaultValue="models">
+            <Tabs defaultValue={tabs[0]?.id}>
               <TabsList className="w-full">
-                {TABS.map((t) => (
+                {tabs.map((t) => (
                   <TabsTrigger key={t.id} value={t.id} className="flex-1">
-                    {t.label}
+                    {t.tabLabel}
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <TabsContent key={t.id} value={t.id} className="mt-1">
                   <DimensionList
                     groups={t.pick(overview)}
@@ -207,6 +191,11 @@ export default function ProviderDetailSheet({
                     variant={t.variant}
                     emptyLabel={t.emptyLabel}
                     fallbackLabel={t.fallbackLabel}
+                    onSelect={
+                      onDrill && isEntityId(t.id)
+                        ? (group) => onDrill(t.id as EntityId, group)
+                        : undefined
+                    }
                   />
                 </TabsContent>
               ))}

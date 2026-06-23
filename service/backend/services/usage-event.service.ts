@@ -79,6 +79,7 @@ const baseFilters = (
   toTs: window.toTs,
   app: query.app || undefined,
   provider: query.provider || undefined,
+  model: query.model || undefined,
   clerk_org_id: query.clerk_org_id || undefined,
   clerk_user_id: query.clerk_user_id || undefined,
   action: query.action || undefined,
