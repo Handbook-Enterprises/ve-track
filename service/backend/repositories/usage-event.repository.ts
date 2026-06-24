@@ -1,4 +1,4 @@
-import { eq, and, gte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, sql, desc, notInArray } from "drizzle-orm";
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import UsageEvent from "../models/usage-event.model";
 
@@ -15,6 +15,7 @@ interface BaseFilters {
   clerk_user_id?: string;
   action?: string;
   correlation_id?: string;
+  excludeProviders?: string[];
 }
 
 const buildWhere = (filters: BaseFilters) => {
@@ -26,6 +27,8 @@ const buildWhere = (filters: BaseFilters) => {
     conditions.push(sql`${UsageEvent.timestamp} < ${filters.toTs}`);
   if (filters.app) conditions.push(eq(UsageEvent.app, filters.app));
   if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
+  if (filters.excludeProviders && filters.excludeProviders.length > 0)
+    conditions.push(notInArray(UsageEvent.provider, filters.excludeProviders));
   if (filters.model) conditions.push(eq(UsageEvent.model, filters.model));
   if (filters.clerk_org_id)
     conditions.push(eq(UsageEvent.clerk_org_id, filters.clerk_org_id));
@@ -219,6 +222,8 @@ class UsageEventRepository {
     if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
     if (filters.clerk_org_id) conditions.push(eq(UsageEvent.clerk_org_id, filters.clerk_org_id));
     if (filters.clerk_user_id) conditions.push(eq(UsageEvent.clerk_user_id, filters.clerk_user_id));
+    if (filters.excludeProviders && filters.excludeProviders.length > 0)
+      conditions.push(notInArray(UsageEvent.provider, filters.excludeProviders));
     const [row] = await db
       .select({
         cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,

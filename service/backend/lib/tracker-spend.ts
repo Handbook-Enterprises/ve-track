@@ -73,6 +73,23 @@ export const dailyDelta = (
   return Math.max(0, spend);
 };
 
+export const spendSinceBaseline = (
+  kind: MetricKind,
+  prev: number | null,
+  current: number | null,
+): number => {
+  if (current == null) return 0;
+  if (kind === "cumulative" || kind === "usage" || kind === "credits_used")
+    return prev == null
+      ? Math.max(0, current)
+      : current >= prev
+        ? current - prev
+        : current;
+  if (kind === "balance" || kind === "credits")
+    return prev == null ? 0 : Math.max(0, prev - current);
+  return prev == null ? 0 : Math.max(0, current - prev);
+};
+
 export const deriveDailySpend = (
   snapshots: Array<{ day: string } & MetricFields>,
   kind: MetricKind,
