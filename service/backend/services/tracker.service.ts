@@ -13,6 +13,8 @@ import {
   isMoneyKind,
   valueFor,
   dailyDelta,
+  spendSinceBaseline,
+  type MetricKind,
 } from "../lib/tracker-spend";
 import {
   sealApiKey,
@@ -30,6 +32,14 @@ import type {
   TrackerCreateBody,
   TrackerUpdateKeyBody,
 } from "../interfaces/tracker.interface";
+import type { UsageWindow } from "./usage-event.service";
+
+export interface TrackerContribution {
+  totals: { cost_usd: number };
+  previousCost: number;
+  byProvider: Map<string, { cost_usd: number }>;
+  series: Map<string, { cost_usd: number }>;
+}
 
 const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
@@ -152,6 +162,75 @@ class TrackerService {
       success: true,
       message: TrackerMessages.LIST_SUCCESS,
       trackers: enriched,
+    };
+  }
+
+  static async getOverviewContribution(
+    db: DrizzleD1Database,
+    tenantId: string,
+    window: UsageWindow,
+  ): Promise<TrackerContribution> {
+    const fromTs = window.fromTs;
+    const toTs = window.toTs ?? Date.now();
+    const prevFromTs = fromTs - window.fromDays * DAY_MS;
+
+    const trackers = await TrackerRepository.fetchByTenant(db, tenantId);
+    const moneyTrackers = new Map<
+      string,
+      { provider: string; kind: MetricKind }
+    >();
+    for (const t of trackers) {
+      const kind = metricKind(t);
+      if (isMoneyKind(kind))
+        moneyTrackers.set(t.id, { provider: t.provider, kind });
+    }
+
+    const byProvider = new Map<string, { cost_usd: number }>();
+    const series = new Map<string, { cost_usd: number }>();
+    let currentCost = 0;
+    let previousCost = 0;
+
+    if (moneyTrackers.size > 0) {
+      const snaps = await TrackerSnapshotRepository.recentForTenant(
+        db,
+        tenantId,
+        0,
+      );
+      const baseline = new Map<string, number | null>();
+      for (const s of snaps) {
+        const meta = moneyTrackers.get(s.tracker_id);
+        if (!meta) continue;
+        const value = valueFor(meta.kind, s);
+        if (value == null) continue;
+        const prev = baseline.get(s.tracker_id) ?? null;
+        const spend = spendSinceBaseline(meta.kind, prev, value);
+        baseline.set(s.tracker_id, value);
+        if (spend <= 0) continue;
+        const ts = s.ts ?? Date.parse(`${s.day}T00:00:00Z`);
+        if (ts >= fromTs && ts <= toTs) {
+          currentCost += spend;
+          const p = byProvider.get(meta.provider) ?? { cost_usd: 0 };
+          p.cost_usd += spend;
+          byProvider.set(meta.provider, p);
+          const d = series.get(s.day) ?? { cost_usd: 0 };
+          d.cost_usd += spend;
+          series.set(s.day, d);
+        } else if (ts >= prevFromTs && ts < fromTs) {
+          previousCost += spend;
+        }
+      }
+    }
+
+    for (const [key, value] of byProvider)
+      byProvider.set(key, { cost_usd: round6(value.cost_usd) ?? 0 });
+    for (const [key, value] of series)
+      series.set(key, { cost_usd: round6(value.cost_usd) ?? 0 });
+
+    return {
+      totals: { cost_usd: round6(currentCost) ?? 0 },
+      previousCost: round6(previousCost) ?? 0,
+      byProvider,
+      series,
     };
   }
 

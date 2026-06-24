@@ -52,13 +52,13 @@ const parseFromDays = (raw?: string): number => {
   return Math.min(parsed, 365);
 };
 
-interface UsageWindow {
+export interface UsageWindow {
   fromTs: number;
   toTs?: number;
   fromDays: number;
 }
 
-const resolveWindow = (query: UsageQuery): UsageWindow => {
+export const resolveWindow = (query: UsageQuery): UsageWindow => {
   const from = query.from != null ? parseInt(query.from, 10) : NaN;
   const to = query.to != null ? parseInt(query.to, 10) : NaN;
   if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
@@ -73,6 +73,7 @@ const baseFilters = (
   tenantId: string,
   query: UsageQuery,
   window: UsageWindow,
+  excludeProviders?: string[],
 ) => ({
   tenant_id: tenantId,
   fromTs: window.fromTs,
@@ -84,6 +85,10 @@ const baseFilters = (
   clerk_user_id: query.clerk_user_id || undefined,
   action: query.action || undefined,
   correlation_id: query.correlation_id || undefined,
+  excludeProviders:
+    excludeProviders && excludeProviders.length > 0
+      ? excludeProviders
+      : undefined,
 });
 
 const validateEvent = (e: UsageEventInput) => {
@@ -218,12 +223,13 @@ class UsageEventService {
     db: DrizzleD1Database,
     tenantId: string,
     query: UsageQuery,
+    excludeProviders?: string[],
   ) {
     const window = resolveWindow(query);
     const groups = await UsageEventRepository.groupBy(
       db,
       "provider",
-      baseFilters(tenantId, query, window),
+      baseFilters(tenantId, query, window, excludeProviders),
     );
     return this.respond(groups, window.fromDays);
   }
@@ -261,11 +267,12 @@ class UsageEventService {
     db: DrizzleD1Database,
     tenantId: string,
     query: UsageQuery,
+    excludeProviders?: string[],
   ): Promise<UsageSeriesPoint[]> {
     const window = resolveWindow(query);
     const rows = await UsageEventRepository.dailySeries(
       db,
-      baseFilters(tenantId, query, window),
+      baseFilters(tenantId, query, window, excludeProviders),
     );
     return rows.map((r) => ({
       day: r.day,
@@ -278,10 +285,11 @@ class UsageEventService {
     db: DrizzleD1Database,
     tenantId: string,
     query: UsageQuery,
+    excludeProviders?: string[],
   ) {
     const window = resolveWindow(query);
     const fromDays = window.fromDays;
-    const filters = baseFilters(tenantId, query, window);
+    const filters = baseFilters(tenantId, query, window, excludeProviders);
     const [totals, prev] = await Promise.all([
       UsageEventRepository.totals(db, filters),
       UsageEventRepository.previousTotals(db, filters, fromDays),

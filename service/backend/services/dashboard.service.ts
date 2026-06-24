@@ -2,7 +2,7 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import { ModelRepository } from "../repositories/model.repository";
 import ApiKeyService from "./api-key.service";
-import UsageEventService from "./usage-event.service";
+import UsageEventService, { resolveWindow } from "./usage-event.service";
 import TrackerService from "./tracker.service";
 import SettingsService from "./settings.service";
 import { resolveIdentities } from "../lib/clerk-identities";
@@ -12,10 +12,25 @@ import type {
   TrackerUpdateKeyBody,
 } from "../interfaces/tracker.interface";
 import type {
+  UsageDelta,
   UsageGroup,
   UsageQuery,
+  UsageSeriesPoint,
 } from "../interfaces/usage-event.interface";
 import type { Env } from "../types";
+
+const deriveDelta = (previousCost: number, currentCost: number): UsageDelta => {
+  let pctChange: number | null = null;
+  let direction: "up" | "down" | "flat" = "flat";
+  if (previousCost > 0) {
+    pctChange = ((currentCost - previousCost) / previousCost) * 100;
+    direction = pctChange > 0.5 ? "up" : pctChange < -0.5 ? "down" : "flat";
+  } else if (currentCost > 0) {
+    pctChange = null;
+    direction = "up";
+  }
+  return { previousCost, pctChange, direction };
+};
 
 class DashboardService {
   static async getMe(db: DrizzleD1Database, tenantId: string) {
@@ -92,16 +107,24 @@ class DashboardService {
     tenantId: string,
     query: UsageQuery,
   ) {
+    const window = resolveWindow(query);
+    const trackerContribution = await TrackerService.getOverviewContribution(
+      db,
+      tenantId,
+      window,
+    );
+    const trackedProviders = [...trackerContribution.byProvider.keys()];
+
     const [byApp, byOrg, byUser, byProvider, byModel, byAction, totals, series] =
       await Promise.all([
         UsageEventService.getByApp(db, tenantId, query),
         UsageEventService.getByOrg(db, tenantId, query),
         UsageEventService.getByUser(db, tenantId, query),
-        UsageEventService.getByProvider(db, tenantId, query),
+        UsageEventService.getByProvider(db, tenantId, query, trackedProviders),
         UsageEventService.getByModel(db, tenantId, query),
         UsageEventService.getByAction(db, tenantId, query),
-        UsageEventService.getTotals(db, tenantId, query),
-        UsageEventService.getSeries(db, tenantId, query),
+        UsageEventService.getTotals(db, tenantId, query, trackedProviders),
+        UsageEventService.getSeries(db, tenantId, query, trackedProviders),
       ]);
 
     const userIds = byUser.groups
@@ -146,18 +169,54 @@ class DashboardService {
       byModelGroups = enrich(byModel.groups, modelMap);
     }
 
+    const mergedCost = totals.totals.cost_usd + trackerContribution.totals.cost_usd;
+    const eventPreviousCost = totals.totals.delta?.previousCost ?? 0;
+    const mergedTotals = {
+      ...totals.totals,
+      cost_usd: mergedCost,
+      delta: deriveDelta(
+        eventPreviousCost + trackerContribution.previousCost,
+        mergedCost,
+      ),
+    };
+
+    const mergedByProvider: UsageGroup[] = byProvider.groups.map((g) => ({
+      ...g,
+    }));
+    for (const [provider, value] of trackerContribution.byProvider) {
+      const existing = mergedByProvider.find((g) => g.key === provider);
+      if (existing) existing.cost_usd += value.cost_usd;
+      else
+        mergedByProvider.push({
+          key: provider,
+          cost_usd: value.cost_usd,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          requests: 0,
+        });
+    }
+    mergedByProvider.sort((a, b) => b.cost_usd - a.cost_usd);
+
+    const mergedSeries: UsageSeriesPoint[] = series.map((p) => ({ ...p }));
+    for (const [day, value] of trackerContribution.series) {
+      const point = mergedSeries.find((p) => p.day === day);
+      if (point) point.cost_usd += value.cost_usd;
+      else mergedSeries.push({ day, cost_usd: value.cost_usd, requests: 0 });
+    }
+    mergedSeries.sort((a, b) => a.day.localeCompare(b.day));
+
     return {
       success: true,
       overview: {
-        fromDays: totals.totals.fromDays,
-        totals: totals.totals,
+        fromDays: mergedTotals.fromDays,
+        totals: mergedTotals,
         byApp: byApp.groups,
         byOrg: enrichedByOrg,
         byUser: enrichedByUser,
-        byProvider: byProvider.groups,
+        byProvider: mergedByProvider,
         byModel: byModelGroups,
         byAction: byAction.groups,
-        series,
+        series: mergedSeries,
       },
     };
   }
