@@ -34,6 +34,8 @@ import type { ProviderGroup, Tracker } from "~/types/tracker.types";
 
 interface Props {
   group: ProviderGroup;
+  isLifetime: boolean;
+  periodLabel: string;
   syncingId: string | null;
   onSync: (id: string) => void;
   onUpdateKey: (id: string, apiKey: string) => Promise<unknown>;
@@ -43,6 +45,8 @@ interface Props {
 
 export default function ProviderTrackerCard({
   group,
+  isLifetime,
+  periodLabel,
   syncingId,
   onSync,
   onUpdateKey,
@@ -109,6 +113,8 @@ export default function ProviderTrackerCard({
               key={a.id}
               account={a}
               provider={group.provider}
+              isLifetime={isLifetime}
+              periodLabel={periodLabel}
               isLast={i === group.accounts.length - 1}
               syncing={syncingId === a.id}
               onSync={onSync}
@@ -126,6 +132,8 @@ export default function ProviderTrackerCard({
 function AccountRow({
   account,
   provider,
+  isLifetime,
+  periodLabel,
   isLast,
   syncing,
   onSync,
@@ -135,6 +143,8 @@ function AccountRow({
 }: {
   account: Tracker;
   provider: string;
+  isLifetime: boolean;
+  periodLabel: string;
   isLast: boolean;
   syncing: boolean;
   onSync: (id: string) => void;
@@ -144,6 +154,9 @@ function AccountRow({
 }) {
   const ok = account.status === "active";
   const primary = primaryMetric(account);
+  const value = isLifetime ? primary.value : account.window_spend;
+  const valueIsMoney = isLifetime ? primary.isMoney : account.is_money;
+  const valueLabel = isLifetime ? primary.label : periodLabel;
   const [editOpen, setEditOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   return (
@@ -187,10 +200,10 @@ function AccountRow({
       />
       <div className="w-24 shrink-0 text-right">
         <p className="font-mono text-[12px] font-semibold tabular-nums">
-          {formatMetric(primary.value, primary.isMoney)}
+          {formatMetric(value, valueIsMoney)}
         </p>
         <p className="font-mono text-[8.5px] uppercase tracking-[0.14em] text-muted-foreground">
-          {primary.label}
+          {valueLabel}
         </p>
       </div>
       <div

@@ -4,13 +4,23 @@ import { useAuthContext } from "~/context/AuthContext";
 import { TrackerService } from "~/services/tracker.service";
 import { getErrorMessage } from "~/utils";
 import { primaryMetric, formatMetric } from "~/utils/tracker-metric";
+import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type {
   ProviderGroup,
   Tracker,
   TrackerCreatePayload,
 } from "~/types/tracker.types";
 
-const groupByProvider = (trackers: Tracker[]): ProviderGroup[] => {
+interface Period {
+  range: DateRange;
+  presetId: RangePresetId | null;
+  isLifetime: boolean;
+}
+
+const groupByProvider = (
+  trackers: Tracker[],
+  period: Period,
+): ProviderGroup[] => {
   const map = new Map<string, Tracker[]>();
   for (const t of trackers) {
     const list = map.get(t.provider) ?? [];
@@ -23,13 +33,19 @@ const groupByProvider = (trackers: Tracker[]): ProviderGroup[] => {
         accounts.map((a) => a.account_ref ?? a.key_last4),
       ).size;
       const primary = accounts.map((a) => primaryMetric(a));
-      const isMoney = primary[0]?.isMoney ?? true;
-      const total = primary.reduce((s, p) => s + (p.value ?? 0), 0);
+      const isMoney = period.isLifetime
+        ? primary[0]?.isMoney ?? true
+        : accounts[0]?.is_money ?? true;
+      const total = period.isLifetime
+        ? primary.reduce((s, p) => s + (p.value ?? 0), 0)
+        : accounts.reduce((s, a) => s + (a.window_spend ?? 0), 0);
       return {
         provider,
         accounts,
         totalCost: total,
-        metricLabel: primary[0]?.label ?? "No data yet",
+        metricLabel: period.isLifetime
+          ? primary[0]?.label ?? "No data yet"
+          : period.range.label,
         metricValue: formatMetric(total, isMoney),
         distinctOrgs,
         hasError: accounts.some((a) => a.status === "error"),
@@ -38,7 +54,7 @@ const groupByProvider = (trackers: Tracker[]): ProviderGroup[] => {
     .sort((a, b) => b.totalCost - a.totalCost);
 };
 
-export function useTrackers() {
+export function useTrackers(period: Period) {
   const { authFetch } = useAuthContext();
   const [trackers, setTrackers] = useState<Tracker[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,18 +62,22 @@ export function useTrackers() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
+  const query = period.isLifetime
+    ? undefined
+    : { from: period.range.from, to: period.range.to };
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await TrackerService.list(authFetch);
+      const data = await TrackerService.list(authFetch, query);
       setTrackers(data.trackers);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, query?.from, query?.to, period.isLifetime]);
 
   const create = useCallback(
     async (payload: TrackerCreatePayload) => {
@@ -135,7 +155,10 @@ export function useTrackers() {
     fetchAll();
   }, [fetchAll]);
 
-  const groups = useMemo(() => groupByProvider(trackers), [trackers]);
+  const groups = useMemo(
+    () => groupByProvider(trackers, period),
+    [trackers, period.isLifetime, period.range.label],
+  );
 
   return {
     trackers,

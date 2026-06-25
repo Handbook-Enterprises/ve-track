@@ -11,11 +11,12 @@ import QuickActions from "~/components/common/quick-actions";
 import { LoadingElement } from "~/components/elements";
 import { formatMoney } from "~/utils/format";
 import {
-  DEFAULT_PRESET_ID,
   buildPreset,
   type DateRange,
   type RangePresetId,
 } from "~/utils/date-range";
+
+const INITIAL_PRESET_ID: RangePresetId = "last_28";
 
 const SectionCard = ({
   title,
@@ -42,21 +43,26 @@ export default function OverviewPage() {
   const { organizationName } = useAuthContext();
 
   const [range, setRange] = useState<DateRange>(() =>
-    buildPreset(DEFAULT_PRESET_ID),
+    buildPreset(INITIAL_PRESET_ID),
   );
   const [activePresetId, setActivePresetId] = useState<RangePresetId | null>(
-    DEFAULT_PRESET_ID,
+    INITIAL_PRESET_ID,
   );
 
   const { overview, loading, setFilters } = useUsage({
     from: range.from,
     to: range.to,
+    lifetime: INITIAL_PRESET_ID === "lifetime",
   });
 
   const handleRangeChange = (next: DateRange, presetId: RangePresetId | null) => {
     setRange(next);
     setActivePresetId(presetId);
-    setFilters({ from: next.from, to: next.to });
+    setFilters({
+      from: next.from,
+      to: next.to,
+      lifetime: presetId === "lifetime",
+    });
   };
 
   const providers = useMemo(
@@ -109,7 +115,7 @@ export default function OverviewPage() {
           title="Providers"
           value={providers.length}
           icon={Layers}
-          description="active in this window"
+          description="active providers"
         />
         <StatCard
           marker="03"

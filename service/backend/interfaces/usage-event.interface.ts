@@ -28,6 +28,7 @@ export interface UsageQuery {
   fromDays?: string;
   from?: string;
   to?: string;
+  lifetime?: string;
   app?: string;
   provider?: string;
   model?: string;

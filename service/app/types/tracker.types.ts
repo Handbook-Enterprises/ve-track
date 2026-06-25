@@ -75,6 +75,9 @@ export type TrackerMetricKind =
 
 export interface TrackerCostDetail {
   series: TrackerCostPoint[];
+  windowTotal: number;
+  lifetime: number;
+  activeDays: number;
   metrics: TrackerMetrics;
   kind: TrackerMetricKind;
   isMoney: boolean;

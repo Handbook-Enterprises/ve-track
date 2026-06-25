@@ -13,8 +13,7 @@ import {
   isMoneyKind,
   valueFor,
   dailyDelta,
-  spendSinceBaseline,
-  type MetricKind,
+  windowTotalFromSnapshots,
 } from "../lib/tracker-spend";
 import {
   sealApiKey,
@@ -37,6 +36,7 @@ import type { UsageWindow } from "./usage-event.service";
 export interface TrackerContribution {
   totals: { cost_usd: number };
   previousCost: number;
+  previousCovered: boolean;
   byProvider: Map<string, { cost_usd: number }>;
   series: Map<string, { cost_usd: number }>;
 }
@@ -146,14 +146,43 @@ const requireSecret = (env: Env): string => {
 };
 
 class TrackerService {
-  static async listForTenant(db: DrizzleD1Database, tenantId: string) {
+  static async listForTenant(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query?: { from?: string; to?: string },
+  ) {
     const trackers = await TrackerRepository.fetchByTenant(db, tenantId);
+
+    const fromTs = query?.from != null ? parseInt(query.from, 10) : null;
+    const toTs = query?.to != null ? parseInt(query.to, 10) : null;
+    const windowed = fromTs != null && toTs != null;
+
+    const byTracker = new Map<
+      string,
+      Array<{ day: string; ts?: number | null; daily_spend?: number | null }>
+    >();
+    if (windowed) {
+      const snaps = await TrackerSnapshotRepository.recentForTenant(
+        db,
+        tenantId,
+        0,
+      );
+      for (const s of snaps) {
+        const list = byTracker.get(s.tracker_id) ?? [];
+        list.push(s);
+        byTracker.set(s.tracker_id, list);
+      }
+    }
 
     const enriched = trackers.map((t) => {
       const kind = metricKind(t);
+      const window_spend = windowed
+        ? windowTotalFromSnapshots(byTracker.get(t.id) ?? [], fromTs!, toTs!)
+            .total
+        : primaryValue(t);
       return {
         ...t,
-        window_spend: primaryValue(t),
+        window_spend,
         is_money: isMoneyKind(kind),
       };
     });
@@ -169,44 +198,57 @@ class TrackerService {
     db: DrizzleD1Database,
     tenantId: string,
     window: UsageWindow,
+    lifetime = false,
   ): Promise<TrackerContribution> {
     const fromTs = window.fromTs;
     const toTs = window.toTs ?? Date.now();
     const prevFromTs = fromTs - window.fromDays * DAY_MS;
 
     const trackers = await TrackerRepository.fetchByTenant(db, tenantId);
-    const moneyTrackers = new Map<
-      string,
-      { provider: string; kind: MetricKind }
-    >();
+    const moneyTrackers = new Map<string, { provider: string }>();
     for (const t of trackers) {
-      const kind = metricKind(t);
-      if (isMoneyKind(kind))
-        moneyTrackers.set(t.id, { provider: t.provider, kind });
+      if (isMoneyKind(metricKind(t)))
+        moneyTrackers.set(t.id, { provider: t.provider });
     }
 
     const byProvider = new Map<string, { cost_usd: number }>();
     const series = new Map<string, { cost_usd: number }>();
     let currentCost = 0;
     let previousCost = 0;
+    let previousCovered = false;
 
     if (moneyTrackers.size > 0) {
+      if (lifetime) {
+        for (const t of trackers) {
+          if (!moneyTrackers.has(t.id)) continue;
+          const spend = t.pulled_cost_usd ?? 0;
+          if (spend <= 0) continue;
+          currentCost += spend;
+          const p = byProvider.get(t.provider) ?? { cost_usd: 0 };
+          p.cost_usd += spend;
+          byProvider.set(t.provider, p);
+        }
+      }
+
       const snaps = await TrackerSnapshotRepository.recentForTenant(
         db,
         tenantId,
         0,
       );
-      const baseline = new Map<string, number | null>();
+      const birthTs = new Map<string, number>();
       for (const s of snaps) {
         const meta = moneyTrackers.get(s.tracker_id);
         if (!meta) continue;
-        const value = valueFor(meta.kind, s);
-        if (value == null) continue;
-        const prev = baseline.get(s.tracker_id) ?? null;
-        const spend = spendSinceBaseline(meta.kind, prev, value);
-        baseline.set(s.tracker_id, value);
-        if (spend <= 0) continue;
         const ts = s.ts ?? Date.parse(`${s.day}T00:00:00Z`);
+        if (!birthTs.has(s.tracker_id)) birthTs.set(s.tracker_id, ts);
+        const spend = s.daily_spend ?? 0;
+        if (spend <= 0) continue;
+        if (lifetime) {
+          const d = series.get(s.day) ?? { cost_usd: 0 };
+          d.cost_usd += spend;
+          series.set(s.day, d);
+          continue;
+        }
         if (ts >= fromTs && ts <= toTs) {
           currentCost += spend;
           const p = byProvider.get(meta.provider) ?? { cost_usd: 0 };
@@ -219,6 +261,10 @@ class TrackerService {
           previousCost += spend;
         }
       }
+
+      previousCovered =
+        birthTs.size > 0 &&
+        [...birthTs.values()].every((ts) => ts <= prevFromTs);
     }
 
     for (const [key, value] of byProvider)
@@ -228,7 +274,8 @@ class TrackerService {
 
     return {
       totals: { cost_usd: round6(currentCost) ?? 0 },
-      previousCost: round6(previousCost) ?? 0,
+      previousCost: lifetime ? 0 : round6(previousCost) ?? 0,
+      previousCovered,
       byProvider,
       series,
     };
@@ -353,10 +400,15 @@ class TrackerService {
       }))
       .filter((p): p is { day: string; value: number } => p.value != null);
 
+    const window = windowTotalFromSnapshots(snapshots, from, to);
+
     return {
       success: true,
       detail: {
         series,
+        windowTotal: window.total,
+        lifetime: round6(tracker.pulled_cost_usd) ?? 0,
+        activeDays: window.activeDays,
         metrics: {
           monthly_spend: tracker.monthly_spend ?? null,
           weekly_spend: tracker.weekly_spend ?? null,

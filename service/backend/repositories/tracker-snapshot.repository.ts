@@ -122,6 +122,7 @@ class TrackerSnapshotRepository {
         total_usage_credits: TrackerSnapshot.total_usage_credits,
         credits_remaining: TrackerSnapshot.credits_remaining,
         request_count: TrackerSnapshot.request_count,
+        daily_spend: TrackerSnapshot.daily_spend,
       })
       .from(TrackerSnapshot)
       .where(
