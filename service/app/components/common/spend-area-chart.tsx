@@ -125,6 +125,8 @@ export default function SpendAreaChart({
           tickLine={false}
           axisLine={false}
           width={52}
+          domain={[0, "auto"]}
+          allowDataOverflow={false}
           tickFormatter={(value: number) => fmt(value)}
           className="text-[11px]"
         />
@@ -143,7 +145,7 @@ export default function SpendAreaChart({
         />
         <Area
           dataKey="cost_usd"
-          type="natural"
+          type="linear"
           stroke="var(--chart-1)"
           strokeWidth={2}
           fill="url(#spend-fill)"
