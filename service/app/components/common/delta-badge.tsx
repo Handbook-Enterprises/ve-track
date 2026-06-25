@@ -20,16 +20,7 @@ export default function DeltaBadge({
   const { direction, pctChange, previousCost } = delta;
 
   if (previousCost === 0 && pctChange === null) {
-    return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 border border-dashed border-foreground/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground",
-          className,
-        )}
-      >
-        new
-      </span>
-    );
+    return null;
   }
 
   if (direction === "flat" || pctChange === null) {

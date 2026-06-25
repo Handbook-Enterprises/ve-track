@@ -11,8 +11,17 @@ import type {
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
 
 export class TrackerService {
-  static async list(authFetch: Fetcher): Promise<TrackersListResponse> {
-    const response = await authFetch("/dashboard/trackers");
+  static async list(
+    authFetch: Fetcher,
+    query?: TrackerCostQuery,
+  ): Promise<TrackersListResponse> {
+    const params = new URLSearchParams();
+    if (query?.from != null) params.set("from", String(query.from));
+    if (query?.to != null) params.set("to", String(query.to));
+    const qs = params.toString();
+    const response = await authFetch(
+      `/dashboard/trackers${qs ? `?${qs}` : ""}`,
+    );
     return handleApiResponse<TrackersListResponse>(response);
   }
 

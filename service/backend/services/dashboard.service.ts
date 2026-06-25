@@ -57,8 +57,12 @@ class DashboardService {
     return ApiKeyService.revoke(db, id);
   }
 
-  static async listTrackers(db: DrizzleD1Database, tenantId: string) {
-    return TrackerService.listForTenant(db, tenantId);
+  static async listTrackers(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query?: { from?: string; to?: string },
+  ) {
+    return TrackerService.listForTenant(db, tenantId, query);
   }
 
   static async createTracker(
@@ -108,10 +112,12 @@ class DashboardService {
     query: UsageQuery,
   ) {
     const window = resolveWindow(query);
+    const lifetime = query.lifetime === "1" || query.lifetime === "true";
     const trackerContribution = await TrackerService.getOverviewContribution(
       db,
       tenantId,
       window,
+      lifetime,
     );
     const trackedProviders = [...trackerContribution.byProvider.keys()];
 
@@ -171,13 +177,24 @@ class DashboardService {
 
     const mergedCost = totals.totals.cost_usd + trackerContribution.totals.cost_usd;
     const eventPreviousCost = totals.totals.delta?.previousCost ?? 0;
+    const trackerDominant =
+      trackerContribution.totals.cost_usd >= totals.totals.cost_usd;
+    const insufficientHistory =
+      trackerDominant && !trackerContribution.previousCovered;
+    let mergedDelta: UsageDelta | undefined;
+    if (!lifetime) {
+      mergedDelta =
+        insufficientHistory && mergedCost > 0
+          ? { previousCost: 0, pctChange: null, direction: "up" }
+          : deriveDelta(
+              eventPreviousCost + trackerContribution.previousCost,
+              mergedCost,
+            );
+    }
     const mergedTotals = {
       ...totals.totals,
       cost_usd: mergedCost,
-      delta: deriveDelta(
-        eventPreviousCost + trackerContribution.previousCost,
-        mergedCost,
-      ),
+      delta: mergedDelta,
     };
 
     const mergedByProvider: UsageGroup[] = byProvider.groups.map((g) => ({

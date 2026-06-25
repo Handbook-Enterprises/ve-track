@@ -15,7 +15,6 @@ import { providerLabel } from "~/utils/providers";
 import {
   CHART_LABEL,
   formatMetric,
-  headlineMetrics,
   isMoneyKind,
   metricKind,
 } from "~/utils/tracker-metric";
@@ -115,8 +114,17 @@ export default function TrackerDetailSheet({
     };
   }, [open, account?.id, range.from, range.to, authFetch]);
 
-  const boxes = account ? headlineMetrics(account) : [];
   const kind = account ? metricKind(account) : "none";
+  const isLifetime = activePresetId === "lifetime";
+  const periodTotal = detail
+    ? isLifetime
+      ? detail.lifetime
+      : detail.windowTotal
+    : null;
+  const avgPerDay =
+    detail && detail.activeDays > 0
+      ? (periodTotal ?? 0) / detail.activeDays
+      : null;
   const chartData = (detail?.series ?? []).map((p) => ({
     day: p.day,
     cost_usd: p.value,
@@ -150,26 +158,6 @@ export default function TrackerDetailSheet({
                   }}
                 />
               </div>
-
-              <div
-                className="grid gap-px bg-border"
-                style={{
-                  gridTemplateColumns: `repeat(${boxes.length}, minmax(0, 1fr))`,
-                }}
-              >
-                {boxes.map((box, i) => (
-                  <HeadlineStat
-                    key={box.label}
-                    label={box.label}
-                    value={
-                      box.value != null
-                        ? formatMetric(box.value, box.isMoney)
-                        : "—"
-                    }
-                    accent={i === 0}
-                  />
-                ))}
-              </div>
             </SheetHeader>
 
             {loading && !detail ? (
@@ -184,6 +172,31 @@ export default function TrackerDetailSheet({
               </div>
             ) : detail ? (
               <div className="space-y-6 px-4 pt-5 pb-6">
+                <section>
+                  <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {isLifetime ? "Lifetime" : range.label}
+                  </p>
+                  <div className="grid grid-cols-2 gap-px bg-border">
+                    <HeadlineStat
+                      label={isLifetime ? "Lifetime spend" : "Total spend"}
+                      value={
+                        periodTotal != null
+                          ? formatMetric(periodTotal, detail.isMoney)
+                          : "—"
+                      }
+                      accent
+                    />
+                    <HeadlineStat
+                      label="Avg / day"
+                      value={
+                        avgPerDay != null
+                          ? formatMetric(avgPerDay, detail.isMoney)
+                          : "—"
+                      }
+                    />
+                  </div>
+                </section>
+
                 <section>
                   <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     {CHART_LABEL[kind]} · {range.label}

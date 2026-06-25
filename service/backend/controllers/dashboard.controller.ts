@@ -65,7 +65,7 @@ class DashboardController {
     const db = drizzle(c.env.DB);
     const tenantId = c.get("tenantId");
     const [error, data] = await manageAsyncOps(
-      DashboardService.listTrackers(db, tenantId),
+      DashboardService.listTrackers(db, tenantId, c.req.query()),
     );
     if (error) throw error;
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);

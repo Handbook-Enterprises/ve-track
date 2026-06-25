@@ -12,6 +12,7 @@ const buildQuery = (filters?: UsageQueryFilters): string => {
   const params = new URLSearchParams();
   if (filters.from != null) params.set("from", String(filters.from));
   if (filters.to != null) params.set("to", String(filters.to));
+  if (filters.lifetime) params.set("lifetime", "1");
   if (filters.fromDays != null) params.set("fromDays", String(filters.fromDays));
   if (filters.app) params.set("app", filters.app);
   if (filters.provider) params.set("provider", filters.provider);

@@ -48,6 +48,7 @@ export interface UsageQueryFilters {
   fromDays?: number;
   from?: number;
   to?: number;
+  lifetime?: boolean;
   app?: string;
   provider?: string;
   model?: string;

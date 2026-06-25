@@ -117,3 +117,28 @@ export const windowSum = (
   }
   return Math.round(total * 1_000_000) / 1_000_000;
 };
+
+export interface WindowTotal {
+  total: number;
+  activeDays: number;
+}
+
+export const windowTotalFromSnapshots = (
+  snapshots: Array<{ day: string; ts?: number | null; daily_spend?: number | null }>,
+  fromTs: number,
+  toTs: number,
+): WindowTotal => {
+  let total = 0;
+  const days = new Set<string>();
+  for (const s of snapshots) {
+    const ts = s.ts ?? Date.parse(`${s.day}T00:00:00Z`);
+    if (ts < fromTs || ts > toTs) continue;
+    days.add(s.day);
+    const value = s.daily_spend ?? 0;
+    if (value > 0) total += value;
+  }
+  return {
+    total: Math.round(total * 1_000_000) / 1_000_000,
+    activeDays: Math.max(1, days.size),
+  };
+};
