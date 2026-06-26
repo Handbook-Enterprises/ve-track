@@ -17,6 +17,8 @@ import { ModeToggle } from "~/components/common/mode-toggle";
 import DashboardSidebar from "~/components/common/dashboard-sidebar";
 import { useAuthContext } from "~/context/AuthContext";
 import { useTenantContext } from "~/context/TenantContext";
+import { OnboardingProvider } from "~/context/OnboardingContext";
+import HowItWorksModal from "~/components/common/how-it-works-modal";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 
 function TenantGuard({ children }: { children: React.ReactNode }) {
@@ -90,6 +92,7 @@ export default function DashboardLayout() {
     <>
       <SignedIn>
         <TenantGuard>
+          <OnboardingProvider>
           <SidebarProvider>
             <DashboardSidebar />
             <SidebarInset>
@@ -112,7 +115,9 @@ export default function DashboardLayout() {
                 <Outlet />
               </main>
             </SidebarInset>
+            <HowItWorksModal />
           </SidebarProvider>
+          </OnboardingProvider>
         </TenantGuard>
       </SignedIn>
       <SignedOut>
