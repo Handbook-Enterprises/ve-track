@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
-import { LoadingElement, ButtonElement } from "~/components/elements";
+import { ButtonElement } from "~/components/elements";
 import DateRangePicker from "~/components/common/date-range-picker";
 import EntityTable from "~/components/common/entity-table";
+import EntityTableSkeleton from "~/components/common/entity-table-skeleton";
 import EntityDetailSheet from "~/components/common/entity-detail-sheet";
 import {
   ENTITIES,
@@ -13,6 +14,7 @@ import {
 import {
   DEFAULT_PRESET_ID,
   buildPreset,
+  isLifetimePreset,
   type DateRange,
   type RangePresetId,
 } from "~/utils/date-range";
@@ -33,6 +35,7 @@ export default function EntityPage({ config }: Props) {
   const { overview, loading, error, refetch, setFilters } = useUsage({
     from: range.from,
     to: range.to,
+    lifetime: isLifetimePreset(DEFAULT_PRESET_ID),
   });
 
   const [selected, setSelected] = useState<{
@@ -47,7 +50,11 @@ export default function EntityPage({ config }: Props) {
   ) => {
     setRange(next);
     setActivePresetId(presetId);
-    setFilters({ from: next.from, to: next.to });
+    setFilters({
+      from: next.from,
+      to: next.to,
+      lifetime: isLifetimePreset(presetId),
+    });
   };
 
   const openEntity = (id: EntityId, group: UsageGroup) => {
@@ -60,32 +67,8 @@ export default function EntityPage({ config }: Props) {
     [config, overview],
   );
 
-  if (loading && !overview.totals.requests) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <LoadingElement size={28} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center border border-destructive/30">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-        </div>
-        <p className="max-w-md text-center text-sm text-muted-foreground">
-          {error}
-        </p>
-        <ButtonElement variant="outline" size="sm" onClick={refetch}>
-          <RefreshCw className="mr-2 h-3.5 w-3.5" />
-          Try again
-        </ButtonElement>
-      </div>
-    );
-  }
-
   const selectedConfig = selected ? ENTITIES[selected.id] : config;
+  const nounLabel = config.noun.replace(/^./, (c) => c.toUpperCase());
 
   return (
     <div className="space-y-8 pb-16">
@@ -116,17 +99,36 @@ export default function EntityPage({ config }: Props) {
         </div>
       </header>
 
-      <EntityTable
-        config={config}
-        rows={rows}
-        totalCost={overview.totals.cost_usd}
-        onSelect={(group) => openEntity(config.id, group)}
-      />
-      <p className="text-[11px] text-muted-foreground">
-        Click a {config.noun} to see its spend over time and how it relates to
-        every other entity. Then click any row inside to jump straight to that
-        entity.
-      </p>
+      {loading ? (
+        <EntityTableSkeleton nounLabel={nounLabel} />
+      ) : error ? (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center border border-destructive/30">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <p className="max-w-md text-center text-sm text-muted-foreground">
+            {error}
+          </p>
+          <ButtonElement variant="outline" size="sm" onClick={refetch}>
+            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+            Try again
+          </ButtonElement>
+        </div>
+      ) : (
+        <EntityTable
+          config={config}
+          rows={rows}
+          totalCost={overview.totals.cost_usd}
+          onSelect={(group) => openEntity(config.id, group)}
+        />
+      )}
+      {!loading && !error ? (
+        <p className="text-[11px] text-muted-foreground">
+          Click a {config.noun} to see its spend over time and how it relates to
+          every other entity. Then click any row inside to jump straight to that
+          entity.
+        </p>
+      ) : null}
 
       <EntityDetailSheet
         config={selectedConfig}

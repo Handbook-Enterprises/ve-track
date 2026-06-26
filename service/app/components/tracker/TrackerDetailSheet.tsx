@@ -7,7 +7,8 @@ import {
 } from "~/components/ui/sheet";
 import { useAuthContext } from "~/context/AuthContext";
 import { TrackerService } from "~/services/tracker.service";
-import { LoadingElement } from "~/components/elements";
+import { Skeleton } from "~/components/ui/skeleton";
+import { ChartSkeleton } from "~/components/common/entity-detail-skeleton";
 import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
 import { cn } from "~/lib/utils";
@@ -18,6 +19,7 @@ import {
   isMoneyKind,
   metricKind,
 } from "~/utils/tracker-metric";
+import { isLifetimePreset } from "~/utils/date-range";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type { Tracker, TrackerCostDetail } from "~/types/tracker.types";
 
@@ -115,7 +117,7 @@ export default function TrackerDetailSheet({
   }, [open, account?.id, range.from, range.to, authFetch]);
 
   const kind = account ? metricKind(account) : "none";
-  const isLifetime = activePresetId === "lifetime";
+  const isLifetime = isLifetimePreset(activePresetId);
   const periodTotal = detail
     ? isLifetime
       ? detail.lifetime
@@ -160,15 +162,29 @@ export default function TrackerDetailSheet({
               </div>
             </SheetHeader>
 
-            {loading && !detail ? (
+            {error && !detail ? (
               <div className="flex min-h-[40vh] items-center justify-center px-4">
-                {error ? (
-                  <p className="max-w-xs text-center text-[12.5px] text-destructive">
-                    {error}
-                  </p>
-                ) : (
-                  <LoadingElement size={20} />
-                )}
+                <p className="max-w-xs text-center text-[12.5px] text-destructive">
+                  {error}
+                </p>
+              </div>
+            ) : loading ? (
+              <div className="space-y-6 px-4 pt-5 pb-6">
+                <section>
+                  <Skeleton className="mb-2.5 h-2.5 w-24" />
+                  <div className="grid grid-cols-2 gap-px bg-border">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="bg-card p-3">
+                        <Skeleton className="h-2.5 w-20" />
+                        <Skeleton className="mt-2 h-4 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <Skeleton className="mb-2.5 h-2.5 w-40" />
+                  <ChartSkeleton />
+                </section>
               </div>
             ) : detail ? (
               <div className="space-y-6 px-4 pt-5 pb-6">
