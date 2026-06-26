@@ -8,7 +8,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useAuthContext } from "~/context/AuthContext";
 import { UsageService } from "~/services/usage.service";
-import { LoadingElement } from "~/components/elements";
+import EntityDetailSkeleton, {
+  DetailStatsSkeleton,
+} from "./entity-detail-skeleton";
 import DateRangePicker from "./date-range-picker";
 import SpendAreaChart from "./spend-area-chart";
 import DimensionList from "./dimension-list";
@@ -21,6 +23,7 @@ import {
   type EntityConfig,
   type EntityId,
 } from "~/utils/entity-dimensions";
+import { isLifetimePreset } from "~/utils/date-range";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type { UsageGroup, UsageOverview } from "~/types/usage.types";
 
@@ -94,6 +97,7 @@ export default function EntityDetailSheet({
       [config.filterKey]: entity.key,
       from: range.from,
       to: range.to,
+      lifetime: isLifetimePreset(activePresetId),
     })
       .then((data) => {
         if (!cancelled) setOverview(data.overview);
@@ -108,7 +112,15 @@ export default function EntityDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, entity?.key, config.filterKey, range.from, range.to, authFetch]);
+  }, [
+    open,
+    entity?.key,
+    config.filterKey,
+    range.from,
+    range.to,
+    activePresetId,
+    authFetch,
+  ]);
 
   const totals = overview?.totals;
   const cost = totals?.cost_usd ?? 0;
@@ -141,29 +153,31 @@ export default function EntityDetailSheet({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-px bg-border">
-            <HeadlineStat label="Spend" value={formatMoney(cost)} accent />
-            <HeadlineStat
-              label="Avg/call"
-              value={calls > 0 ? formatMoney(avg) : "—"}
-            />
-            <HeadlineStat
-              label="Calls"
-              value={calls > 0 ? formatNumber(calls) : "—"}
-            />
-          </div>
+          {loading ? (
+            <DetailStatsSkeleton />
+          ) : (
+            <div className="grid grid-cols-3 gap-px bg-border">
+              <HeadlineStat label="Spend" value={formatMoney(cost)} accent />
+              <HeadlineStat
+                label="Avg/call"
+                value={calls > 0 ? formatMoney(avg) : "—"}
+              />
+              <HeadlineStat
+                label="Calls"
+                value={calls > 0 ? formatNumber(calls) : "—"}
+              />
+            </div>
+          )}
         </SheetHeader>
 
-        {loading && !overview ? (
+        {error && !overview ? (
           <div className="flex min-h-[40vh] items-center justify-center px-4">
-            {error ? (
-              <p className="max-w-xs text-center text-[12.5px] text-destructive">
-                {error}
-              </p>
-            ) : (
-              <LoadingElement size={20} />
-            )}
+            <p className="max-w-xs text-center text-[12.5px] text-destructive">
+              {error}
+            </p>
           </div>
+        ) : loading ? (
+          <EntityDetailSkeleton tabs={tabs.length + (showTrackers ? 1 : 0)} />
         ) : overview ? (
           <div className="space-y-6 px-4 pt-5 pb-6">
             <section>

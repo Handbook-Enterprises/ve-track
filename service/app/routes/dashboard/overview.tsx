@@ -9,10 +9,12 @@ import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
 import ProviderRanking from "~/components/common/provider-ranking";
 import GettingStartedChecklist from "~/components/common/getting-started-checklist";
-import { LoadingElement } from "~/components/elements";
+import { Skeleton } from "~/components/ui/skeleton";
+import { ChartSkeleton } from "~/components/common/entity-detail-skeleton";
 import { formatMoney } from "~/utils/format";
 import {
   buildPreset,
+  isLifetimePreset,
   type DateRange,
   type RangePresetId,
 } from "~/utils/date-range";
@@ -39,6 +41,37 @@ const SectionCard = ({
   </section>
 );
 
+const OverviewSkeleton = () => (
+  <>
+    <div className="grid gap-px bg-border sm:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="bg-card p-5">
+          <Skeleton className="h-2.5 w-6" />
+          <Skeleton className="mt-3 h-2.5 w-20" />
+          <Skeleton className="mt-3 h-6 w-28" />
+        </div>
+      ))}
+    </div>
+    <SectionCard title="Overview" caption="Loading">
+      <div className="p-5">
+        <ChartSkeleton />
+      </div>
+    </SectionCard>
+    <SectionCard title="Top 5 providers" caption="Loading">
+      <div className="divide-y px-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 py-3.5">
+            <Skeleton className="h-3 w-3 shrink-0" />
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="ml-auto h-1.5 w-20" />
+            <Skeleton className="h-3.5 w-14" />
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  </>
+);
+
 export default function OverviewPage() {
   const { tenant } = useTenantContext();
   const { organizationName } = useAuthContext();
@@ -62,7 +95,7 @@ export default function OverviewPage() {
   const { overview, loading, setFilters } = useUsage({
     from: range.from,
     to: range.to,
-    lifetime: INITIAL_PRESET_ID === "lifetime",
+    lifetime: isLifetimePreset(INITIAL_PRESET_ID),
   });
 
   const handleRangeChange = (next: DateRange, presetId: RangePresetId | null) => {
@@ -71,7 +104,7 @@ export default function OverviewPage() {
     setFilters({
       from: next.from,
       to: next.to,
-      lifetime: presetId === "lifetime",
+      lifetime: isLifetimePreset(presetId),
     });
   };
 
@@ -83,14 +116,6 @@ export default function OverviewPage() {
   const totalCost = overview.totals.cost_usd;
   const hasSpend = totalCost > 0 || overview.totals.requests > 0;
   const subjectName = organizationName || tenant?.name || "your tenant";
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <LoadingElement size={28} />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 pb-16">
@@ -110,6 +135,10 @@ export default function OverviewPage() {
         />
       </header>
 
+      {loading ? (
+        <OverviewSkeleton />
+      ) : (
+        <>
       <div className="grid gap-px bg-border sm:grid-cols-3">
         <StatCard
           accent
@@ -154,6 +183,8 @@ export default function OverviewPage() {
       >
         <ProviderRanking providers={providers} totalCost={totalCost} />
       </SectionCard>
+        </>
+      )}
     </div>
   );
 }

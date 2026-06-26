@@ -3,8 +3,9 @@ import { Link } from "react-router";
 import { Plug } from "lucide-react";
 import { useTrackers } from "~/hooks/useTrackers";
 import AccountRow from "./AccountRow";
-import { LoadingElement } from "~/components/elements";
+import { AccountRowsSkeleton } from "./tracker-skeletons";
 import { providerLabel } from "~/utils/providers";
+import { isLifetimePreset } from "~/utils/date-range";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 
 interface Props {
@@ -18,9 +19,10 @@ export default function ProviderTrackersTab({
   range,
   presetId,
 }: Props) {
+  const isLifetime = isLifetimePreset(presetId);
   const period = useMemo(
-    () => ({ range, presetId, isLifetime: false }),
-    [range, presetId],
+    () => ({ range, presetId, isLifetime }),
+    [range, presetId, isLifetime],
   );
   const { groups, loading, syncingId, sync, updateKey, disconnect } =
     useTrackers(period);
@@ -33,11 +35,7 @@ export default function ProviderTrackersTab({
   }, [groups, providerKey]);
 
   if (loading && accounts.length === 0) {
-    return (
-      <div className="flex min-h-[30vh] items-center justify-center">
-        <LoadingElement size={18} />
-      </div>
-    );
+    return <AccountRowsSkeleton rows={2} />;
   }
 
   if (accounts.length === 0) {
@@ -68,7 +66,7 @@ export default function ProviderTrackersTab({
           key={a.id}
           account={a}
           provider={providerKey}
-          isLifetime={false}
+          isLifetime={isLifetime}
           periodLabel={range.label}
           isLast={i === accounts.length - 1}
           syncing={syncingId === a.id}

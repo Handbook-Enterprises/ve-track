@@ -1,4 +1,4 @@
-import { Activity, Building2, Cpu, Layers, User2 } from "lucide-react";
+import { Activity, Building2, Cpu, Layers, Tag, User2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { providerLabel } from "./providers";
 import type {
@@ -15,7 +15,13 @@ export type DimensionId =
   | "org"
   | "action";
 
-export type EntityId = "provider" | "model" | "app" | "people" | "org";
+export type EntityId =
+  | "provider"
+  | "model"
+  | "app"
+  | "people"
+  | "org"
+  | "action";
 
 export interface DimensionDef {
   id: DimensionId;
@@ -98,6 +104,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
     label: (g) => g.key ?? "Untagged",
     emptyLabel: "Untagged",
     fallbackLabel: "Untagged",
+    filterKey: "action",
   },
 };
 
@@ -152,6 +159,16 @@ export const ENTITIES: Record<EntityId, EntityConfig> = {
     icon: Building2,
     related: ["app", "model", "provider", "action", "people"],
   },
+  action: {
+    ...(DIMENSIONS.action as DimensionDef & { filterKey: keyof UsageQueryFilters }),
+    id: "action",
+    navLabel: "Actions",
+    noun: "action",
+    nounPlural: "actions",
+    route: "/dashboard/actions",
+    icon: Tag,
+    related: ["provider", "model", "app", "people", "org"],
+  },
 };
 
 export const ENTITY_LIST: EntityConfig[] = [
@@ -160,6 +177,7 @@ export const ENTITY_LIST: EntityConfig[] = [
   ENTITIES.app,
   ENTITIES.people,
   ENTITIES.org,
+  ENTITIES.action,
 ];
 
 export const isEntityId = (id: DimensionId): id is EntityId =>
@@ -167,4 +185,5 @@ export const isEntityId = (id: DimensionId): id is EntityId =>
   id === "model" ||
   id === "app" ||
   id === "people" ||
-  id === "org";
+  id === "org" ||
+  id === "action";

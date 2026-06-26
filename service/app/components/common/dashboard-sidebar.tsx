@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   PlugZap,
   Settings,
+  Tag,
   User2,
 } from "lucide-react";
 import {
@@ -36,6 +37,7 @@ const NAV = [
   { title: "Apps", url: "/dashboard/apps", icon: Layers },
   { title: "People", url: "/dashboard/people", icon: User2 },
   { title: "Organizations", url: "/dashboard/orgs", icon: Building2 },
+  { title: "Actions", url: "/dashboard/actions", icon: Tag },
   { title: "Trackers", url: "/dashboard/trackers", icon: PlugZap },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
