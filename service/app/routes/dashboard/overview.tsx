@@ -8,7 +8,7 @@ import StatCard from "~/components/common/stat-card";
 import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
 import ProviderRanking from "~/components/common/provider-ranking";
-import QuickActions from "~/components/common/quick-actions";
+import GettingStartedChecklist from "~/components/common/getting-started-checklist";
 import { LoadingElement } from "~/components/elements";
 import { formatMoney } from "~/utils/format";
 import {
@@ -81,6 +81,7 @@ export default function OverviewPage() {
   );
   const topProvider = providers[0] ?? null;
   const totalCost = overview.totals.cost_usd;
+  const hasSpend = totalCost > 0 || overview.totals.requests > 0;
   const subjectName = organizationName || tenant?.name || "your tenant";
 
   if (loading) {
@@ -139,7 +140,7 @@ export default function OverviewPage() {
         />
       </div>
 
-      <QuickActions />
+      <GettingStartedChecklist hasSpend={hasSpend} />
 
       <SectionCard title="Overview" caption={range.label}>
         <div className="p-5">
