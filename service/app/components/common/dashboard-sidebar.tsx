@@ -3,6 +3,7 @@ import {
   Activity,
   Building2,
   Cpu,
+  HelpCircle,
   KeyRound,
   Layers,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import {
 } from "~/components/ui/sidebar";
 import Logo from "~/components/common/logo";
 import { useTenantContext } from "~/context/TenantContext";
+import { useOnboarding } from "~/context/OnboardingContext";
 
 const NAV = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -41,6 +43,7 @@ const NAV = [
 export default function DashboardSidebar() {
   const location = useLocation();
   const { tenant } = useTenantContext();
+  const { openOnboarding } = useOnboarding();
 
   const isActive = (url: string) => {
     if (url === "/dashboard") return location.pathname === "/dashboard";
@@ -75,7 +78,19 @@ export default function DashboardSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="gap-3 p-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={openOnboarding}
+              tooltip="How it works"
+            >
+              <HelpCircle />
+              <span>How it works</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
         <div className="space-y-1 group-data-[collapsible=icon]:hidden">
           <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
             Active tenant

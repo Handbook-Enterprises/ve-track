@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Crown, Layers, Wallet } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
 import { useTenantContext } from "~/context/TenantContext";
 import { useAuthContext } from "~/context/AuthContext";
+import { useOnboarding } from "~/context/OnboardingContext";
 import StatCard from "~/components/common/stat-card";
 import DateRangePicker from "~/components/common/date-range-picker";
 import SpendAreaChart from "~/components/common/spend-area-chart";
@@ -41,6 +42,15 @@ const SectionCard = ({
 export default function OverviewPage() {
   const { tenant } = useTenantContext();
   const { organizationName } = useAuthContext();
+  const { hasSeen, openOnboarding } = useOnboarding();
+
+  const promptedRef = useRef(false);
+  useEffect(() => {
+    if (!hasSeen && !promptedRef.current) {
+      promptedRef.current = true;
+      openOnboarding();
+    }
+  }, [hasSeen, openOnboarding]);
 
   const [range, setRange] = useState<DateRange>(() =>
     buildPreset(INITIAL_PRESET_ID),
