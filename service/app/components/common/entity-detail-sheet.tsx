@@ -12,6 +12,7 @@ import { LoadingElement } from "~/components/elements";
 import DateRangePicker from "./date-range-picker";
 import SpendAreaChart from "./spend-area-chart";
 import DimensionList from "./dimension-list";
+import ProviderTrackersTab from "~/components/tracker/ProviderTrackersTab";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
 import {
@@ -115,6 +116,7 @@ export default function EntityDetailSheet({
   const avg = calls > 0 ? cost / calls : 0;
   const title = entity ? config.label(entity) : "";
   const tabs = config.related.map((id) => DIMENSIONS[id]);
+  const showTrackers = config.id === "provider" && Boolean(entity?.key);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -182,7 +184,21 @@ export default function EntityDetailSheet({
                     {t.tabLabel}
                   </TabsTrigger>
                 ))}
+                {showTrackers ? (
+                  <TabsTrigger value="trackers" className="flex-1">
+                    Trackers
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
+              {showTrackers && entity ? (
+                <TabsContent value="trackers" className="mt-1">
+                  <ProviderTrackersTab
+                    providerKey={entity.key ?? ""}
+                    range={range}
+                    presetId={activePresetId}
+                  />
+                </TabsContent>
+              ) : null}
               {tabs.map((t) => (
                 <TabsContent key={t.id} value={t.id} className="mt-1">
                   <DimensionList
