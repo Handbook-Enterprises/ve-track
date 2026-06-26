@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import SiteNav from "~/components/common/site-nav";
+import DocsHeader from "~/components/common/docs-header";
 import SiteFooter from "~/components/common/site-footer";
 import CodeBlock from "~/components/common/code-block";
 import DocsCopyForLLM from "~/components/common/docs-copy-llm";
@@ -95,7 +95,7 @@ export default function Docs(_props: Route.ComponentProps) {
 
   return (
     <main className="min-h-screen bg-black font-mono text-white antialiased">
-      <SiteNav />
+      <DocsHeader />
 
       <div className="mx-auto max-w-[88rem] px-6 pt-28">
         <div className="grid gap-12 lg:grid-cols-[14rem_minmax(0,1fr)_13rem]">
@@ -356,7 +356,6 @@ export default function Docs(_props: Route.ComponentProps) {
                   className="mt-5 inline-flex items-center gap-2 bg-white px-5 py-2.5 text-[12px] font-bold uppercase tracking-[0.12em] text-black transition-colors hover:bg-[#FF4D00]"
                 >
                   Get a key
-                  <span aria-hidden>→</span>
                 </Link>
               </div>
             </Section>

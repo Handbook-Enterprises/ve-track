@@ -1,13 +1,12 @@
 import { Link } from "react-router";
+import Logo from "~/components/common/logo";
 
 export default function SiteFooter() {
   return (
     <footer className="px-6 py-16">
       <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-12 border-t border-white/10 pt-12">
         <div>
-          <h4 className="font-display text-xl font-bold uppercase tracking-tight">
-            ve-track
-          </h4>
+          <Logo type="logo" size={22} />
           <p className="mt-3 max-w-xs text-xs text-white/50">
             The cost attribution layer for AI shaped apps. Built by ViewEngine.
           </p>
