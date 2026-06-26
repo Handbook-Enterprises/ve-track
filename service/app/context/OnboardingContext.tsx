@@ -2,12 +2,11 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { useTenantContext } from "~/context/TenantContext";
+import { useTenantFlag } from "~/hooks/useTenantFlag";
 
 interface OnboardingContextType {
   open: boolean;
@@ -21,36 +20,16 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(
   undefined,
 );
 
-const KEY_PREFIX = "ve-track-onboarding-seen";
-
-const storageKey = (tenantId: string | null | undefined) =>
-  tenantId ? `${KEY_PREFIX}:${tenantId}` : KEY_PREFIX;
-
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const { tenant } = useTenantContext();
-  const tenantId = tenant?.id ?? null;
-
   const [open, setOpen] = useState(false);
-  const [hasSeen, setHasSeen] = useState(true);
+  const [hasSeen, setHasSeen] = useTenantFlag("onboarding-seen");
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setHasSeen(localStorage.getItem(storageKey(tenantId)) === "1");
-  }, [tenantId]);
-
-  const markSeen = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(storageKey(tenantId), "1");
-    }
-    setHasSeen(true);
-  }, [tenantId]);
-
+  const markSeen = useCallback(() => setHasSeen(true), [setHasSeen]);
   const openOnboarding = useCallback(() => setOpen(true), []);
-
   const closeOnboarding = useCallback(() => {
     setOpen(false);
-    markSeen();
-  }, [markSeen]);
+    setHasSeen(true);
+  }, [setHasSeen]);
 
   const value = useMemo(
     () => ({ open, hasSeen, openOnboarding, closeOnboarding, markSeen }),
