@@ -11,6 +11,7 @@
     "cf-typegen": "wrangler types",
     "deploy": "npm run build && wrangler deploy --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
     "dev": "react-router dev --port 5174 --host 127.0.0.1",
+    "reconcile": "bun scripts/reconcile.ts",
     "postdeploy": "npm run sentry:sourcemaps",
     "postinstall": "npm run cf-typegen",
     "preview": "npm run build && vite preview",

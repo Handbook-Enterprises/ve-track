@@ -65,13 +65,18 @@ const monthPreset = (offset: number): RangePreset => {
   };
 };
 
+export const LIFETIME_PRESET_ID: RangePresetId = "lifetime";
+
+export const isLifetimePreset = (id: RangePresetId | null): boolean =>
+  id === LIFETIME_PRESET_ID;
+
 export const RANGE_PRESETS: RangePreset[] = [
   lastDays(7, "Last 7 days"),
   lastDays(28, "Last 28 days"),
   lastDays(90, "Last 90 days"),
   lastDays(365, "Last 365 days"),
   {
-    id: "lifetime",
+    id: LIFETIME_PRESET_ID,
     label: "Lifetime",
     build: () =>
       range(startOfDay(subYears(new Date(), 5)), endOfDay(new Date()), "Lifetime"),

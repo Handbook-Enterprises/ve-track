@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, PlugZap } from "lucide-react";
-import { LoadingElement } from "~/components/elements";
 import AddTrackerDialog from "~/components/tracker/AddTrackerDialog";
 import ProviderTrackerCard from "~/components/tracker/ProviderTrackerCard";
+import TrackerCardsSkeleton from "~/components/tracker/tracker-skeletons";
 import TrackerDetailSheet from "~/components/tracker/TrackerDetailSheet";
 import DateRangePicker from "~/components/common/date-range-picker";
 import { useTrackers } from "~/hooks/useTrackers";
-import { buildPreset } from "~/utils/date-range";
+import { buildPreset, isLifetimePreset } from "~/utils/date-range";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type { Tracker } from "~/types/tracker.types";
 
@@ -19,7 +19,7 @@ export default function TrackersPage() {
   const [activePresetId, setActivePresetId] = useState<RangePresetId | null>(
     INITIAL_PRESET_ID,
   );
-  const isLifetime = activePresetId === "lifetime";
+  const isLifetime = isLifetimePreset(activePresetId);
 
   const period = useMemo(
     () => ({ range, presetId: activePresetId, isLifetime }),
@@ -91,9 +91,7 @@ export default function TrackersPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16">
-            <LoadingElement size={24} />
-          </div>
+          <TrackerCardsSkeleton />
         ) : error ? (
           <div className="flex flex-col items-center gap-3 border border-destructive/30 bg-destructive/5 p-6 text-center">
             <AlertTriangle className="h-5 w-5 text-destructive" />
