@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useTenantFlag } from "~/hooks/useTenantFlag";
+import { useUserFlag } from "~/hooks/useUserFlag";
 
 interface OnboardingContextType {
   open: boolean;
@@ -22,7 +22,7 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [hasSeen, setHasSeen] = useTenantFlag("onboarding-seen");
+  const [hasSeen, setHasSeen] = useUserFlag("onboarding-seen");
 
   const markSeen = useCallback(() => setHasSeen(true), [setHasSeen]);
   const openOnboarding = useCallback(() => setOpen(true), []);
