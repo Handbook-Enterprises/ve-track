@@ -158,38 +158,42 @@ body {
   }
 }
 
-.driver-popover {
+.vetrack-tour.driver-popover {
   border-radius: 0;
   border: 1px solid var(--border);
-  background: var(--popover);
+  background-color: var(--popover);
   color: var(--popover-foreground);
   box-shadow: 0 12px 44px rgba(0, 0, 0, 0.22);
 }
-.driver-popover-title {
+.vetrack-tour .driver-popover-title {
+  color: var(--popover-foreground);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-.driver-popover-description,
-.driver-popover-progress-text {
+.vetrack-tour .driver-popover-description,
+.vetrack-tour .driver-popover-progress-text {
   color: var(--muted-foreground);
 }
-.driver-popover-close-btn {
+.vetrack-tour .driver-popover-close-btn {
   color: var(--muted-foreground);
 }
-.driver-popover-prev-btn,
-.driver-popover-next-btn {
+.vetrack-tour .driver-popover-close-btn:hover {
+  color: var(--popover-foreground);
+}
+.vetrack-tour .driver-popover-prev-btn,
+.vetrack-tour .driver-popover-next-btn {
   border-radius: 0;
   text-shadow: none;
   font-weight: 600;
   border: 1px solid var(--border);
-  background: var(--card);
+  background-color: var(--card);
   color: var(--foreground);
 }
-.driver-popover-next-btn {
-  background: #fd5200 !important;
-  border-color: #fd5200 !important;
-  color: #ffffff !important;
+.vetrack-tour .driver-popover-next-btn {
+  background-color: #fd5200;
+  border-color: #fd5200;
+  color: #ffffff;
 }
-.driver-popover-arrow {
+.vetrack-tour .driver-popover-arrow {
   display: none;
 }

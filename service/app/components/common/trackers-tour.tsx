@@ -15,6 +15,7 @@ export default function TrackersTour() {
 
     const timer = window.setTimeout(() => {
       const tour = driver({
+        popoverClass: "vetrack-tour",
         showProgress: true,
         allowClose: true,
         overlayOpacity: 0.6,
