@@ -157,3 +157,39 @@ body {
     @apply font-sans;
   }
 }
+
+.driver-popover {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.22);
+}
+.driver-popover-title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.driver-popover-description,
+.driver-popover-progress-text {
+  color: var(--muted-foreground);
+}
+.driver-popover-close-btn {
+  color: var(--muted-foreground);
+}
+.driver-popover-prev-btn,
+.driver-popover-next-btn {
+  border-radius: 0;
+  text-shadow: none;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+}
+.driver-popover-next-btn {
+  background: #fd5200 !important;
+  border-color: #fd5200 !important;
+  color: #ffffff !important;
+}
+.driver-popover-arrow {
+  display: none;
+}
