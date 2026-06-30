@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useTenantContext } from "~/context/TenantContext";
+import { useAuthContext } from "~/context/AuthContext";
 
-export function useTenantFlag(name: string) {
-  const { tenant } = useTenantContext();
-  const tenantId = tenant?.id ?? null;
-  const key = tenantId ? `ve-track-${name}:${tenantId}` : `ve-track-${name}`;
+export function useUserFlag(name: string) {
+  const { userId } = useAuthContext();
+  const key = userId ? `ve-track-${name}:user:${userId}` : `ve-track-${name}`;
 
   const [value, setValue] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;

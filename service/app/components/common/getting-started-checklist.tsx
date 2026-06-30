@@ -16,7 +16,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import QuickActions from "~/components/common/quick-actions";
 import { useApiKeys } from "~/hooks/useApiKeys";
 import { useTrackers } from "~/hooks/useTrackers";
-import { useTenantFlag } from "~/hooks/useTenantFlag";
+import { useUserFlag } from "~/hooks/useUserFlag";
 import { buildPreset } from "~/utils/date-range";
 import { cn } from "~/lib/utils";
 
@@ -61,7 +61,7 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
       marker: "01",
       icon: KeyRound,
       title: "Create your first API key",
-      description: "Authenticate the SDK so your events can reach VE Rank.",
+      description: "Authenticate the SDK so your events can reach VE Track.",
       cta: "Create a key",
       href: "/dashboard/keys",
       done: hasApiKey,
@@ -234,7 +234,7 @@ export default function GettingStartedChecklist({
 }) {
   const [params] = useSearchParams();
   const preview = params.get("checklist") === "preview";
-  const [dismissed, setDismissed] = useTenantFlag("checklist-dismissed");
+  const [dismissed, setDismissed] = useUserFlag("checklist-dismissed");
 
   if (dismissed && !preview) return <QuickActions />;
 
