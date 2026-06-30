@@ -4,6 +4,7 @@ import AddTrackerDialog from "~/components/tracker/AddTrackerDialog";
 import ProviderTrackerCard from "~/components/tracker/ProviderTrackerCard";
 import TrackerCardsSkeleton from "~/components/tracker/tracker-skeletons";
 import TrackerDetailSheet from "~/components/tracker/TrackerDetailSheet";
+import TrackersTour from "~/components/common/trackers-tour";
 import DateRangePicker from "~/components/common/date-range-picker";
 import { useTrackers } from "~/hooks/useTrackers";
 import { buildPreset, isLifetimePreset } from "~/utils/date-range";
@@ -51,6 +52,7 @@ export default function TrackersPage() {
 
   return (
     <div className="space-y-10 pb-16">
+      <TrackersTour />
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground/15 pb-7">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -65,7 +67,9 @@ export default function TrackersPage() {
             use, costs from the same provider combine into one total.
           </p>
         </div>
-        <AddTrackerDialog onSubmit={create} loading={isSubmitting} />
+        <div data-tour="add-tracker">
+          <AddTrackerDialog onSubmit={create} loading={isSubmitting} />
+        </div>
       </header>
 
       <section className="space-y-4">
@@ -79,43 +83,47 @@ export default function TrackersPage() {
               {trackers.length} {trackers.length === 1 ? "account" : "accounts"}
               {errorCount > 0 ? ` · ${errorCount} attention` : ""}
             </p>
-            <DateRangePicker
-              value={range}
-              activePresetId={activePresetId}
-              onChange={(next, presetId) => {
-                setRange(next);
-                setActivePresetId(presetId);
-              }}
-            />
+            <div data-tour="period">
+              <DateRangePicker
+                value={range}
+                activePresetId={activePresetId}
+                onChange={(next, presetId) => {
+                  setRange(next);
+                  setActivePresetId(presetId);
+                }}
+              />
+            </div>
           </div>
         </div>
 
-        {loading ? (
-          <TrackerCardsSkeleton />
-        ) : error ? (
-          <div className="flex flex-col items-center gap-3 border border-destructive/30 bg-destructive/5 p-6 text-center">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        ) : groups.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="space-y-3">
-            {groups.map((g) => (
-              <ProviderTrackerCard
-                key={g.provider}
-                group={g}
-                isLifetime={isLifetime}
-                periodLabel={range.label}
-                syncingId={syncingId}
-                onSync={sync}
-                onUpdateKey={updateKey}
-                onDisconnect={disconnect}
-                onOpenAccount={openAccount}
-              />
-            ))}
-          </div>
-        )}
+        <div data-tour="providers">
+          {loading ? (
+            <TrackerCardsSkeleton />
+          ) : error ? (
+            <div className="flex flex-col items-center gap-3 border border-destructive/30 bg-destructive/5 p-6 text-center">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          ) : groups.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="space-y-3">
+              {groups.map((g) => (
+                <ProviderTrackerCard
+                  key={g.provider}
+                  group={g}
+                  isLifetime={isLifetime}
+                  periodLabel={range.label}
+                  syncingId={syncingId}
+                  onSync={sync}
+                  onUpdateKey={updateKey}
+                  onDisconnect={disconnect}
+                  onOpenAccount={openAccount}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <TrackerDetailSheet

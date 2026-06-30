@@ -17,6 +17,7 @@ import QuickActions from "~/components/common/quick-actions";
 import { useApiKeys } from "~/hooks/useApiKeys";
 import { useTrackers } from "~/hooks/useTrackers";
 import { useUserFlag } from "~/hooks/useUserFlag";
+import { useUserChecklist } from "~/hooks/useUserChecklist";
 import { buildPreset } from "~/utils/date-range";
 import { cn } from "~/lib/utils";
 
@@ -49,11 +50,22 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
 
   const { apiKeys, loading: keysLoading } = useApiKeys();
   const { trackers, loading: trackersLoading } = useTrackers(period);
-  const { organization } = useOrganization();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
 
   const hasApiKey = apiKeys.some((k) => !k.revoked_at);
   const hasTracker = trackers.length > 0;
   const hasTeam = (organization?.membersCount ?? 0) > 1;
+  const loading = keysLoading || trackersLoading;
+
+  const conditions = useMemo(
+    () => ({ key: hasApiKey, tracker: hasTracker, spend: hasSpend, team: hasTeam }),
+    [hasApiKey, hasTracker, hasSpend, hasTeam],
+  );
+  const done = useUserChecklist(
+    "checklist-progress",
+    conditions,
+    !loading && orgLoaded,
+  );
 
   const steps: Step[] = [
     {
@@ -64,7 +76,7 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
       description: "Authenticate the SDK so your events can reach VE Track.",
       cta: "Create a key",
       href: "/dashboard/keys",
-      done: hasApiKey,
+      done: done.key,
     },
     {
       id: "tracker",
@@ -74,7 +86,7 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
       description: "Pull a real provider bill, or drop the SDK into your app.",
       cta: "Add a tracker",
       href: "/dashboard/trackers",
-      done: hasTracker,
+      done: done.tracker,
     },
     {
       id: "spend",
@@ -85,7 +97,7 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
       cta: "See how",
       href: "/docs#quickstart",
       external: true,
-      done: hasSpend,
+      done: done.spend,
     },
     {
       id: "team",
@@ -95,14 +107,13 @@ function ChecklistCard({ hasSpend, onDismiss }: CardProps) {
       description: "Bring in teammates so spend maps to the people behind it.",
       cta: "Invite people",
       href: "/dashboard/people",
-      done: hasTeam,
+      done: done.team,
     },
   ];
 
   const total = steps.length;
   const completed = steps.filter((s) => s.done).length;
   const pct = Math.round((completed / total) * 100);
-  const loading = keysLoading || trackersLoading;
   const allDone = !loading && completed === total;
 
   if (loading) {
