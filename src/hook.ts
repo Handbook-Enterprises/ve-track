@@ -132,6 +132,8 @@ export interface TrackUsageInput {
   action?: string;
   userId?: string | null;
   orgId?: string | null;
+  creditsCharged?: number | null;
+  creditPriceUsd?: number | null;
 }
 
 export function trackUsage(usage: TrackUsageInput): void {
@@ -154,6 +156,45 @@ export function trackUsage(usage: TrackUsageInput): void {
     latency_ms: usage.latencyMs ?? null,
     cost_usd: usage.costUsd ?? null,
     status_code: usage.statusCode ?? null,
+    credits_charged: usage.creditsCharged ?? null,
+    credit_price_usd_at_event: usage.creditPriceUsd ?? null,
+  };
+  scope.buffer.push(event);
+}
+
+export interface TrackCreditsInput {
+  credits: number;
+  action?: string;
+  provider?: string;
+  creditPriceUsd?: number | null;
+  userId?: string | null;
+  orgId?: string | null;
+}
+
+export function trackCredits(input: TrackCreditsInput): void {
+  const scope = requestContext.getStore();
+  if (!scope) return;
+  if (typeof input.credits !== "number" || !Number.isFinite(input.credits))
+    return;
+  const event: VeTrackEvent = {
+    id: crypto.randomUUID(),
+    timestamp: Date.now(),
+    app: scope.app,
+    clerk_user_id: input.userId !== undefined ? input.userId : scope.userId,
+    clerk_org_id: input.orgId !== undefined ? input.orgId : scope.orgId,
+    action: input.action ?? scope.action,
+    provider: input.provider ?? "autumn",
+    model: null,
+    prompt_tokens: null,
+    completion_tokens: null,
+    cached_input_tokens: null,
+    cache_write_tokens: null,
+    reasoning_tokens: null,
+    latency_ms: null,
+    cost_usd: null,
+    status_code: null,
+    credits_charged: input.credits,
+    credit_price_usd_at_event: input.creditPriceUsd ?? null,
   };
   scope.buffer.push(event);
 }

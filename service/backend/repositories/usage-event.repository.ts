@@ -76,6 +76,7 @@ class UsageEventRepository {
         cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
         prompt_tokens: sql<number>`COALESCE(SUM(${UsageEvent.prompt_tokens}), 0)`,
         completion_tokens: sql<number>`COALESCE(SUM(${UsageEvent.completion_tokens}), 0)`,
+        credits: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
       .from(UsageEvent)
@@ -90,12 +91,19 @@ class UsageEventRepository {
         cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
         prompt_tokens: sql<number>`COALESCE(SUM(${UsageEvent.prompt_tokens}), 0)`,
         completion_tokens: sql<number>`COALESCE(SUM(${UsageEvent.completion_tokens}), 0)`,
+        credits: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
       .from(UsageEvent)
       .where(buildWhere(filters));
     return (
-      row ?? { cost_usd: 0, prompt_tokens: 0, completion_tokens: 0, requests: 0 }
+      row ?? {
+        cost_usd: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        credits: 0,
+        requests: 0,
+      }
     );
   }
 
@@ -109,6 +117,7 @@ class UsageEventRepository {
       .select({
         day,
         cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        credits: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
       .from(UsageEvent)
