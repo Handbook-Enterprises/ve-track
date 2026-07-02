@@ -22,6 +22,7 @@ export default [
     route("dashboard/people", "routes/dashboard/people.tsx", { id: "dashboard-people" }),
     route("dashboard/orgs", "routes/dashboard/orgs.tsx", { id: "dashboard-orgs" }),
     route("dashboard/actions", "routes/dashboard/actions.tsx", { id: "dashboard-actions" }),
+    route("dashboard/credits", "routes/dashboard/credits.tsx", { id: "dashboard-credits" }),
     route("dashboard/trackers", "routes/dashboard/trackers.tsx", { id: "dashboard-trackers" }),
     route("dashboard/settings", "routes/dashboard/settings.tsx", { id: "dashboard-settings" }),
   ]),

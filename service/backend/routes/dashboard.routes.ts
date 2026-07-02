@@ -27,6 +27,8 @@ dashboardRouter.post("/trackers/:id/sync", DashboardController.syncTrackerContro
 dashboardRouter.get("/trackers/:id/costs", DashboardController.trackerCostsController);
 dashboardRouter.patch("/trackers/:id", DashboardController.updateTrackerController);
 dashboardRouter.get("/overview", DashboardController.overviewController);
+dashboardRouter.get("/credits", DashboardController.creditsController);
+dashboardRouter.get("/credits/detail", DashboardController.creditsDetailController);
 dashboardRouter.post("/canary", DashboardController.canaryController);
 dashboardRouter.get("/settings", DashboardController.settingsController);
 dashboardRouter.patch("/settings", DashboardController.updateSettingsController);

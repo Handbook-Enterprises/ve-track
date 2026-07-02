@@ -4,6 +4,38 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.7.0 — 2026-07-02
+
+### Credit ledger + Credits dashboard
+
+Credit charges now have a home and a view. The SDK started carrying credit data in v0.6.0; this release materializes it into a dedicated ledger and surfaces it on the dashboard, ahead of wiring credit tracking into the product apps.
+
+- **New `credits` table** (model `Credit`, migration `0026_credits.sql`): one row per credit charge — `app`, `action`, `clerk_org_id`, `clerk_user_id`, `credits`, `credit_price_usd`, `cost_usd` (provider cost for the correlated action), `correlation_id`, `source`, timestamps. Indexed by tenant+time, tenant+app+action, tenant+org, and tenant+correlation.
+- **Populated at ingest:** every incoming event with `credits_charged` writes a `credits` row (idempotent on the event id), with `cost_usd` summed from sibling provider events sharing its `correlation_id`. Events without credits are unaffected.
+- **Credits dashboard** (`/dashboard/credits`): grouped summary by app / action / organization showing credits, revenue, provider cost, and margin, with a detail sheet (revenue over time + breakdown). Backed by new Clerk-auth endpoints `GET /api/dashboard/credits` and `/api/dashboard/credits/detail`.
+- **Docs:** added a Credits guide section. Corrected the README Credits section: `trackCredits` (with `priceUsd`) is currently the only way charges reach the ledger — the `credit_pricing` table exists but server-side credit computation from the rate card is not live yet.
+
+This is the visibility layer only — computing credits from the rate card and deducting from Autumn remains a later phase.
+
+### Self-host
+- Apply migration `0026_credits.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`).
+
+## v0.6.0 — 2026-07-01
+
+### Credits are now a first-class tracked parameter
+
+Every event the SDK emits now carries `credits_charged`, `credit_price_usd_at_event`, and `correlation_id`, matching the columns `usage_events` already has (migration `0010`). Until now the SDK could not populate them, so credit data had to be POSTed to `/api/v1/events` by hand. No database migration is needed — the columns already exist and older SDKs simply sent null.
+
+- **Correlation ids are automatic.** Each scope gets a fresh `correlation_id` (regenerated per `trackAction` / `trackMessage`), so all of one action's provider fetches share an id. This is the key the dashboard joins on to reconcile an action's provider **cost** against the credits it **charged**.
+- **`trackCredits({ credits, priceUsd? })`** — new helper to record a customer charge from inside a tracked scope, on the same correlation as the action's costs. Thin wrapper over `trackUsage` with `provider: "credits"`.
+- **`withCorrelation(id, fn)`** — run a block under an explicit correlation id; `trackMessage` also reads `body.correlationId` from the producer so a queued job reconciles with the request that enqueued it.
+- **`trackUsage`** gained optional `credits`, `creditPriceUsd`, and `correlationId` fields.
+
+Server-side deduction (computing credits from the rate card and charging the central Autumn account on ingest) is intentionally not in this release — the SDK's job is only to carry the data. Apps that already compute their own credits can send them today via `trackCredits`.
+
+### Compatibility
+- Purely additive: new optional fields and two new exports (`trackCredits`, `withCorrelation`). No migration, no breaking changes. Push the package to GitHub so dependent apps' CI can resolve the new version.
+
 ## v0.5.5 — 2026-06-20
 
 ### Tracker cost moved out of usage_events into its own table

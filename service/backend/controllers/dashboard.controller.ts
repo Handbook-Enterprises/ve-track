@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import DashboardService from "../services/dashboard.service";
+import CreditService from "../services/credit.service";
 import SettingsService, {
   type TenantSettingsShape,
 } from "../services/settings.service";
@@ -141,6 +142,26 @@ class DashboardController {
     const tenantId = c.get("tenantId");
     const [error, data] = await manageAsyncOps(
       DashboardService.getOverview(db, c.env, tenantId, c.req.query() as UsageQuery),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async creditsController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      CreditService.getSummary(db, tenantId, c.req.query() as UsageQuery),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async creditsDetailController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      CreditService.getDetail(db, tenantId, c.req.query() as UsageQuery),
     );
     if (error) throw error;
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);

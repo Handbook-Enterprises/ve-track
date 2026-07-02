@@ -1,5 +1,6 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { UsageEventRepository } from "../repositories/usage-event.repository";
+import { CreditRepository } from "../repositories/credit.repository";
 import PricingService, { REPRICE_PROVIDERS } from "./pricing.service";
 import { UsageEventMessages } from "../messages/usage-event.messages";
 import { CustomError } from "../utils";
@@ -37,7 +38,7 @@ const resolveProfitabilityDim = (raw?: string): ProfitabilityDimension => {
   return PROFITABILITY_DIM_MAP[raw] ?? "action";
 };
 
-const computeMargin = (revenue: number, cost: number) => {
+export const computeMargin = (revenue: number, cost: number) => {
   const margin_usd = revenue - cost;
   const margin_pct = revenue > 0 ? (margin_usd / revenue) * 100 : null;
   return { margin_usd, margin_pct };
@@ -169,6 +170,38 @@ class UsageEventService {
     });
 
     const inserted = await UsageEventRepository.insertMany(db, rows);
+
+    const now = Date.now();
+    const creditRows = rows
+      .filter((r) => r.credits_charged != null)
+      .map((r) => {
+        const correlationCost = r.correlation_id
+          ? rows.reduce(
+              (sum, e) =>
+                e.correlation_id === r.correlation_id && e.cost_usd != null
+                  ? sum + e.cost_usd
+                  : sum,
+              0,
+            )
+          : (r.cost_usd ?? 0);
+        return {
+          id: r.id,
+          tenant_id: tenantId,
+          timestamp: r.timestamp,
+          app: r.app,
+          action: r.action ?? null,
+          clerk_org_id: r.clerk_org_id ?? null,
+          clerk_user_id: r.clerk_user_id ?? null,
+          credits: r.credits_charged as number,
+          credit_price_usd: r.credit_price_usd_at_event ?? null,
+          cost_usd: correlationCost || null,
+          correlation_id: r.correlation_id ?? null,
+          source: "sdk",
+          created_at: now,
+        };
+      });
+    if (creditRows.length > 0) await CreditRepository.insertMany(db, creditRows);
+
     return {
       success: true,
       message: UsageEventMessages.INGEST_SUCCESS,

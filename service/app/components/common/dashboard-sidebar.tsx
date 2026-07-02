@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router";
 import {
   Activity,
   Building2,
+  Coins,
   Cpu,
   HelpCircle,
   KeyRound,
@@ -38,6 +39,7 @@ const NAV = [
   { title: "People", url: "/dashboard/people", icon: User2 },
   { title: "Organizations", url: "/dashboard/orgs", icon: Building2 },
   { title: "Actions", url: "/dashboard/actions", icon: Tag },
+  { title: "Credits", url: "/dashboard/credits", icon: Coins },
   { title: "Trackers", url: "/dashboard/trackers", icon: PlugZap },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];

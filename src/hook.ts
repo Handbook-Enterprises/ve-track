@@ -62,6 +62,9 @@ export function installFetchHook(): void {
         latency_ms: latencyMs,
         cost_usd: usage?.costUsd ?? null,
         status_code: response.status,
+        credits_charged: usage?.credits ?? null,
+        credit_price_usd_at_event: usage?.creditPriceUsd ?? null,
+        correlation_id: usage?.correlationId ?? scope.correlationId ?? null,
       };
 
       scope.buffer.push(event);
@@ -80,6 +83,7 @@ export function runScope<T>(
 ): Promise<T> {
   if (!scope.pending) scope.pending = [];
   if (scope.action === undefined) scope.action = null;
+  if (scope.correlationId === undefined) scope.correlationId = crypto.randomUUID();
   return requestContext.run(scope, async () => {
     try {
       return await Promise.resolve(handler());
@@ -114,7 +118,21 @@ export function withAction<T>(
 ): Promise<T> {
   const scope = requestContext.getStore();
   if (!scope) return Promise.resolve(handler());
-  const childScope: RequestScope = { ...scope, action };
+  const childScope: RequestScope = {
+    ...scope,
+    action,
+    correlationId: crypto.randomUUID(),
+  };
+  return Promise.resolve(requestContext.run(childScope, handler));
+}
+
+export function withCorrelation<T>(
+  correlationId: string,
+  handler: () => Promise<T> | T,
+): Promise<T> {
+  const scope = requestContext.getStore();
+  if (!scope) return Promise.resolve(handler());
+  const childScope: RequestScope = { ...scope, correlationId };
   return Promise.resolve(requestContext.run(childScope, handler));
 }
 
@@ -132,6 +150,9 @@ export interface TrackUsageInput {
   action?: string;
   userId?: string | null;
   orgId?: string | null;
+  credits?: number | null;
+  creditPriceUsd?: number | null;
+  correlationId?: string | null;
 }
 
 export function trackUsage(usage: TrackUsageInput): void {
@@ -154,8 +175,36 @@ export function trackUsage(usage: TrackUsageInput): void {
     latency_ms: usage.latencyMs ?? null,
     cost_usd: usage.costUsd ?? null,
     status_code: usage.statusCode ?? null,
+    credits_charged: usage.credits ?? null,
+    credit_price_usd_at_event: usage.creditPriceUsd ?? null,
+    correlation_id: usage.correlationId ?? scope.correlationId ?? null,
   };
   scope.buffer.push(event);
+}
+
+export interface TrackCreditsInput {
+  credits: number;
+  priceUsd?: number | null;
+  action?: string;
+  correlationId?: string | null;
+  userId?: string | null;
+  orgId?: string | null;
+  provider?: string;
+  model?: string | null;
+}
+
+export function trackCredits(input: TrackCreditsInput): void {
+  trackUsage({
+    provider: input.provider ?? "credits",
+    model: input.model ?? null,
+    costUsd: null,
+    credits: input.credits,
+    creditPriceUsd: input.priceUsd ?? null,
+    correlationId: input.correlationId,
+    action: input.action,
+    userId: input.userId,
+    orgId: input.orgId,
+  });
 }
 
 export function getCurrentScope(): RequestScope | undefined {

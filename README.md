@@ -9,6 +9,7 @@ This README is the integration guide. For pricing internals, architecture, dashb
 - [Patterns by worker shape](#patterns-by-worker-shape)
 - [Tagging work with actions](#tagging-work-with-actions)
 - [Manual events](#manual-events)
+- [Credits](#credits)
 - [Configuration](#configuration)
 - [Providers](#providers)
 - [Identifying users + orgs](#identifying-users--orgs)
@@ -61,6 +62,8 @@ That's it. Every external provider fetch is now intercepted, priced, attributed 
 | `trackMessage(message, fn)` | Inside a queue handler, scopes a single message under its body's `auth` + `action`. Reads `body.auth.userId`, `body.auth.orgId`, `body.action` automatically. |
 | `trackAction(label, fn)` | Tags a block of work with an action label. Useful when one HTTP request runs multiple distinct actions. |
 | `trackUsage(usage)` | Manually emit one event from inside a scope — for a provider the lib doesn't auto-detect, or a cost you compute yourself. See [Manual events](#manual-events). |
+| `trackCredits({ credits, priceUsd? })` | Record credits charged to the customer for this action, on the same correlation as its provider costs. Always pass `priceUsd` so revenue and margin compute. See [Credits](#credits). |
+| `withCorrelation(id, fn)` | Run a block under an explicit correlation id so its provider costs and credits reconcile as one action. |
 | `withUser({ userId, orgId }, fn)` | Override user/org for a block. Rare. |
 | `getCurrentScope()` | Inspect what's currently being tracked. Debugging only. |
 
@@ -190,6 +193,27 @@ trackUsage({
 ```
 
 It inherits the current scope's `app`, user, org, and `action` — override any per call. Outside a scope it's a silent no-op, so it's safe to leave in. For a provider you hit repeatedly, add it to `src/providers.ts` instead (see [Providers](#providers)).
+
+---
+
+## Credits
+
+Every tracked event now carries three credit fields alongside its cost: `credits_charged`, `credit_price_usd_at_event`, and `correlation_id`. Provider fetches leave credits null and inherit the scope's correlation id, so the dashboard can reconcile what an action **cost** us against what it **charged** the customer, per action.
+
+Each scope gets a correlation id automatically (a fresh one per `trackAction` / `trackMessage`), so a single action's provider fetches already share one id. Record the credits you charged from inside that same scope:
+
+```ts
+import { trackCredits } from "@viewengine/track";
+
+await trackAction("rank-refresh", async () => {
+  await runRankCheck(env);       // provider fetches auto-tracked under this correlation
+  trackCredits({ credits: 1, priceUsd: 0.01 });
+});
+```
+
+To tie a queue message to the request that produced it, pass `correlationId` on the message body (`trackMessage` reads it automatically), or wrap any block with `withCorrelation(id, fn)`.
+
+`trackCredits` is currently the **only** way charges reach the credit ledger — the app computes the charge and reports it. Always pass `priceUsd`: revenue on the Credits dashboard is `credits × priceUsd`, so omitting it records the credits with zero revenue and a meaningless margin. A server-side rate card (`credit_pricing`, keyed by app + action) that computes credits automatically from the provider events you already send is planned but not live yet.
 
 ---
 

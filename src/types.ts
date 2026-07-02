@@ -11,6 +11,9 @@ export interface VeTrackUsage {
   cachedInputTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
+  credits?: number | null;
+  creditPriceUsd?: number | null;
+  correlationId?: string | null;
 }
 
 export interface VeTrackEvent {
@@ -30,6 +33,9 @@ export interface VeTrackEvent {
   latency_ms: number | null;
   cost_usd: number | null;
   status_code: number | null;
+  credits_charged: number | null;
+  credit_price_usd_at_event: number | null;
+  correlation_id: string | null;
 }
 
 export interface RequestScope {
@@ -40,6 +46,7 @@ export interface RequestScope {
   userId: string | null;
   orgId: string | null;
   action: string | null;
+  correlationId?: string | null;
   buffer: VeTrackEvent[];
   pending: Promise<unknown>[];
 }

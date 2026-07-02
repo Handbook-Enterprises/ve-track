@@ -8,10 +8,12 @@ export {
   runScope,
   withUser,
   withAction,
+  withCorrelation,
   getCurrentScope,
   trackUsage,
+  trackCredits,
 } from "./hook";
-export type { TrackUsageInput } from "./hook";
+export type { TrackUsageInput, TrackCreditsInput } from "./hook";
 export { PROVIDERS, cloroCreditsToUsd } from "./providers";
 export type {
   TrackedHandlerConfig,

@@ -1,5 +1,5 @@
 import { trackedHandler } from "./handler";
-import { runScope, withAction, withUser } from "./hook";
+import { runScope, withAction, withCorrelation, withUser } from "./hook";
 import { clerkUserResolver } from "./clerk";
 import type { RequestScope, UserResolver } from "./types";
 
@@ -122,9 +122,14 @@ export function trackMessage<T>(
     null;
   const action =
     typeof body.action === "string" ? (body.action as string) : null;
+  const correlationId =
+    typeof body.correlationId === "string" ? (body.correlationId as string) : null;
 
   const inner = () => Promise.resolve(fn());
-  const wrapped = action ? () => withAction(action, inner) : inner;
+  const withCorr = correlationId
+    ? () => withCorrelation(correlationId, inner)
+    : inner;
+  const wrapped = action ? () => withAction(action, withCorr) : withCorr;
   return withUser({ userId, orgId }, wrapped);
 }
 

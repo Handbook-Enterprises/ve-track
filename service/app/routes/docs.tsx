@@ -32,6 +32,7 @@ const NAV_GROUPS: Array<{ group: string; items: Array<{ id: string; label: strin
       { id: "worker-shapes", label: "Worker shapes" },
       { id: "actions", label: "Tagging actions" },
       { id: "manual-events", label: "Manual events" },
+      { id: "credits", label: "Credits" },
     ],
   },
   {
@@ -261,7 +262,34 @@ export default function Docs(_props: Route.ComponentProps) {
               />
             </Section>
 
-            <Section id="configuration" index={5} title="Configuration">
+            <Section id="credits" index={5} title="Credits">
+              <P>
+                Every event carries three credit fields next to its cost:{" "}
+                <C>credits_charged</C>, <C>credit_price_usd_at_event</C>, and{" "}
+                <C>correlation_id</C>. Provider fetches leave credits null and inherit
+                the scope's correlation id, so the dashboard can reconcile what an
+                action cost you against what it charged the customer.
+              </P>
+              <P>
+                Each scope gets a correlation id automatically, a fresh one per{" "}
+                <C>trackAction</C> or <C>trackMessage</C>, so one action's provider
+                fetches already share it. Record the credits you charged from inside
+                that same scope with <C>trackCredits</C>:
+              </P>
+              <CodeBlock
+                language="ts"
+                code={`import { trackCredits } from "@viewengine/track";\n\nawait trackAction("rank-refresh", async () => {\n  await runRankCheck(env);\n  trackCredits({ credits: 1, priceUsd: 0.01 });\n});`}
+              />
+              <P>
+                To tie a queued job to the request that produced it, pass{" "}
+                <C>correlationId</C> on the message body (<C>trackMessage</C> reads it),
+                or wrap a block with <C>withCorrelation(id, fn)</C>. Charges land in the{" "}
+                <C>credits</C> ledger and surface on the Credits dashboard, grouped by
+                app, action, and organization with revenue, provider cost, and margin.
+              </P>
+            </Section>
+
+            <Section id="configuration" index={6} title="Configuration">
               <P>
                 <C>trackHandler(config, handler)</C> accepts:
               </P>
@@ -297,7 +325,7 @@ export default function Docs(_props: Route.ComponentProps) {
               />
             </Section>
 
-            <Section id="providers" index={6} title="Providers">
+            <Section id="providers" index={7} title="Providers">
               <P>
                 These domains are auto detected and priced for you, no config. Token based
                 LLMs are priced server side from a live catalog; the rest use the cost the
@@ -331,7 +359,7 @@ export default function Docs(_props: Route.ComponentProps) {
               </P>
             </Section>
 
-            <Section id="identity" index={7} title="Users and orgs">
+            <Section id="identity" index={8} title="Users and orgs">
               <P>
                 With the default <C>resolveUser: "clerk"</C>, ve-track reads the{" "}
                 <C>Authorization: Bearer</C> header, verifies it with your{" "}
