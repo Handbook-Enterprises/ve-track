@@ -209,6 +209,7 @@ class DashboardService {
           cost_usd: value.cost_usd,
           prompt_tokens: 0,
           completion_tokens: 0,
+          credits: 0,
           requests: 0,
         });
     }
@@ -218,7 +219,13 @@ class DashboardService {
     for (const [day, value] of trackerContribution.series) {
       const point = mergedSeries.find((p) => p.day === day);
       if (point) point.cost_usd += value.cost_usd;
-      else mergedSeries.push({ day, cost_usd: value.cost_usd, requests: 0 });
+      else
+        mergedSeries.push({
+          day,
+          cost_usd: value.cost_usd,
+          credits: 0,
+          requests: 0,
+        });
     }
     mergedSeries.sort((a, b) => a.day.localeCompare(b.day));
 

@@ -61,6 +61,7 @@ That's it. Every external provider fetch is now intercepted, priced, attributed 
 | `trackMessage(message, fn)` | Inside a queue handler, scopes a single message under its body's `auth` + `action`. Reads `body.auth.userId`, `body.auth.orgId`, `body.action` automatically. |
 | `trackAction(label, fn)` | Tags a block of work with an action label. Useful when one HTTP request runs multiple distinct actions. |
 | `trackUsage(usage)` | Manually emit one event from inside a scope — for a provider the lib doesn't auto-detect, or a cost you compute yourself. See [Manual events](#manual-events). |
+| `trackCredits(input)` | Report a credit deduction (e.g. from Autumn's `track`) so credit usage shows up per app/action/user/org on the dashboard. See [Manual events](#manual-events). |
 | `withUser({ userId, orgId }, fn)` | Override user/org for a block. Rare. |
 | `getCurrentScope()` | Inspect what's currently being tracked. Debugging only. |
 
@@ -190,6 +191,28 @@ trackUsage({
 ```
 
 It inherits the current scope's `app`, user, org, and `action` — override any per call. Outside a scope it's a silent no-op, so it's safe to leave in. For a provider you hit repeatedly, add it to `src/providers.ts` instead (see [Providers](#providers)).
+
+### Credits
+
+If your app bills users in credits (we use [Autumn](https://useautumn.com)), report each deduction with `trackCredits` right after the billing call succeeds. The dashboard then shows credit usage per app, action, user, org, provider, and model, alongside cost:
+
+```ts
+import { trackCredits } from "@viewengine/track";
+
+const result = await autumn.track({
+  customerId: user.id,
+  featureId: "ai_search",
+  value: 3,
+});
+
+trackCredits({
+  credits: 3,          // required — credits deducted
+  action: "ai_search", // defaults to the current scope's action
+  creditPriceUsd: 0.01, // optional — powers revenue/profitability
+});
+```
+
+Standalone credit events are recorded under provider `"autumn"` (override with `provider`). To attach credits to the same event as the provider call that caused them, pass `creditsCharged` / `creditPriceUsd` to `trackUsage` instead — that's what feeds `/api/v1/breakdown/profitability`. Like `trackUsage`, `trackCredits` is a silent no-op outside a scope.
 
 ---
 

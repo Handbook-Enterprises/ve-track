@@ -119,6 +119,20 @@ export default function EntityTable({
         },
       },
       {
+        id: "credits",
+        accessorFn: (row) => row.credits ?? 0,
+        header: () => <span>Credits</span>,
+        meta: { align: "right", headClassName: "w-24", cellClassName: "w-24" },
+        cell: ({ row }) => {
+          const credits = row.original.credits ?? 0;
+          return (
+            <span className="block text-right text-[12.5px] text-muted-foreground tabular-nums">
+              {credits > 0 ? formatNumber(credits) : "—"}
+            </span>
+          );
+        },
+      },
+      {
         id: "avg",
         accessorFn: (row) => (row.requests > 0 ? row.cost_usd / row.requests : 0),
         header: () => <span>Avg/call</span>,

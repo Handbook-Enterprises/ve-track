@@ -41,6 +41,7 @@ export interface UsageQuery {
 export interface UsageSeriesPoint {
   day: string;
   cost_usd: number;
+  credits: number;
   requests: number;
 }
 
@@ -49,6 +50,7 @@ export interface UsageGroup {
   cost_usd: number;
   prompt_tokens: number;
   completion_tokens: number;
+  credits: number;
   requests: number;
   name?: string | null;
   secondary?: string | null;
@@ -65,6 +67,7 @@ export interface UsageTotals {
   cost_usd: number;
   prompt_tokens: number;
   completion_tokens: number;
+  credits: number;
   requests: number;
   fromDays: number;
   delta?: UsageDelta;
