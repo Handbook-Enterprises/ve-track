@@ -1,6 +1,7 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { UsageEventRepository } from "../repositories/usage-event.repository";
 import PricingService, { REPRICE_PROVIDERS } from "./pricing.service";
+import SettingsService from "./settings.service";
 import { UsageEventMessages } from "../messages/usage-event.messages";
 import { CustomError } from "../utils";
 import { HTTP_STATUS_CODES } from "../constants";
@@ -120,6 +121,15 @@ class UsageEventService {
 
     const index = await PricingService.getIndex(db);
 
+    const needsDefaultPrice = valid.some(
+      (e) => e.credits_charged != null && e.credit_price_usd_at_event == null,
+    );
+    let defaultCreditPrice: number | null = null;
+    if (needsDefaultPrice) {
+      const settings = await SettingsService.resolve(db, tenantId);
+      defaultCreditPrice = settings.credit_price_usd;
+    }
+
     const rows = valid.map((e) => {
       const cachedInput = e.cached_input_tokens ?? 0;
       const cacheWrite = e.cache_write_tokens ?? 0;
@@ -165,7 +175,9 @@ class UsageEventService {
         cost_confidence,
         status_code: e.status_code ?? null,
         credits_charged: e.credits_charged ?? null,
-        credit_price_usd_at_event: e.credit_price_usd_at_event ?? null,
+        credit_price_usd_at_event:
+          e.credit_price_usd_at_event ??
+          (e.credits_charged != null ? defaultCreditPrice : null),
         correlation_id: e.correlation_id ?? null,
       };
     });

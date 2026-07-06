@@ -214,6 +214,8 @@ trackCredits({
 
 Standalone credit events are recorded under provider `"autumn"` (override with `provider`). To attach credits to the same event as the provider call that caused them, pass `creditsCharged` / `creditPriceUsd` to `trackUsage` instead — that's what feeds `/api/v1/breakdown/profitability`. Like `trackUsage`, `trackCredits` is a silent no-op outside a scope.
 
+**Default credit price.** If your organization charges the same credit price across all its apps, set it once in the dashboard under **Settings → Credits → Default credit price** and omit `creditPriceUsd` everywhere. Any credit event that arrives without a price is stamped with the default at ingest. Pass `creditPriceUsd` only in apps with their own unique pricing — an explicit value always wins over the default. Events ingested before a default is set stay unpriced.
+
 ---
 
 ## Configuration

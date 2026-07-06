@@ -82,6 +82,8 @@ curl -s -X POST https://track.viewengine.ai/api/v1/events \
   -d @events.json
 ```
 
+If an event carries `credits_charged` but omits `credit_price_usd_at_event`, the tenant's default credit price (dashboard: Settings → Credits) is stamped onto the event at ingest. An explicit `credit_price_usd_at_event` always wins. If no default is set, the price stays `null` and the event contributes zero revenue to profitability.
+
 ### Usage aggregations
 
 | Method | Path | Returns |
