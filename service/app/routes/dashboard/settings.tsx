@@ -1,22 +1,25 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Check, RefreshCw } from "lucide-react";
 import { useSettings } from "~/hooks/useSettings";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 import { Switch } from "~/components/ui/switch";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "~/components/ui/input-group";
 import { SETTINGS_GROUPS, type SettingDef } from "~/utils/settings-registry";
 import type { SettingKey, TenantSettings } from "~/types/settings.types";
 
-function SettingRow({
+function RowShell({
   setting,
-  checked,
-  busy,
   isLast,
-  onToggle,
+  children,
 }: {
   setting: SettingDef;
-  checked: boolean;
-  busy: boolean;
   isLast: boolean;
-  onToggle: (value: boolean) => void;
+  children: React.ReactNode;
 }) {
   return (
     <div
@@ -32,18 +35,127 @@ function SettingRow({
           {setting.description}
         </p>
       </div>
+      {children}
+    </div>
+  );
+}
+
+function SwitchRow({
+  setting,
+  checked,
+  busy,
+  isLast,
+  onToggle,
+}: {
+  setting: SettingDef;
+  checked: boolean;
+  busy: boolean;
+  isLast: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <RowShell setting={setting} isLast={isLast}>
       <Switch
         checked={checked}
         disabled={busy}
         onCheckedChange={onToggle}
         className="mt-0.5 shrink-0"
       />
-    </div>
+    </RowShell>
+  );
+}
+
+function PriceRow({
+  setting,
+  value,
+  busy,
+  isLast,
+  onSave,
+}: {
+  setting: SettingDef;
+  value: number | null;
+  busy: boolean;
+  isLast: boolean;
+  onSave: (value: number | null) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState(value == null ? "" : String(value));
+  const [justSaved, setJustSaved] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setDraft(value == null ? "" : String(value));
+  }, [value]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, []);
+
+  const flash = () => {
+    setJustSaved(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setJustSaved(false), 2000);
+  };
+
+  const commit = async () => {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value != null && (await onSave(null))) flash();
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDraft(value == null ? "" : String(value));
+      return;
+    }
+    if (parsed === value) {
+      setDraft(String(parsed));
+      return;
+    }
+    if (await onSave(parsed)) flash();
+  };
+
+  return (
+    <RowShell setting={setting} isLast={isLast}>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <InputGroup className="w-52">
+          <InputGroupAddon align="inline-start">
+            <InputGroupText>$</InputGroupText>
+          </InputGroupAddon>
+          <InputGroupInput
+            type="text"
+            inputMode="decimal"
+            placeholder="0.01"
+            aria-label={setting.label}
+            value={draft}
+            disabled={busy}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+          <InputGroupAddon align="inline-end">
+            <InputGroupText className="text-[11px]">per credit</InputGroupText>
+          </InputGroupAddon>
+        </InputGroup>
+        <span
+          aria-live="polite"
+          className={`flex items-center gap-1 text-[11px] text-primary transition-opacity duration-200 ${
+            justSaved ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <Check className="h-3 w-3" />
+          Saved
+        </span>
+      </div>
+    </RowShell>
   );
 }
 
 export default function SettingsPage() {
-  const { settings, loading, error, saving, toggle, refetch } = useSettings();
+  const { settings, loading, error, saving, save, refetch } = useSettings();
 
   const groups = SETTINGS_GROUPS.filter((g) => g.settings.length > 0);
 
@@ -99,18 +211,37 @@ export default function SettingsPage() {
               </h2>
             </div>
             <div className="border border-foreground/15 bg-card">
-              {group.settings.map((setting, i) => (
-                <SettingRow
-                  key={setting.key}
-                  setting={setting}
-                  checked={settings[setting.key as SettingKey]}
-                  busy={saving === setting.key}
-                  isLast={i === group.settings.length - 1}
-                  onToggle={(value) =>
-                    toggle(setting.key as keyof TenantSettings, value)
-                  }
-                />
-              ))}
+              {group.settings.map((setting, i) =>
+                setting.control === "price" ? (
+                  <PriceRow
+                    key={setting.key}
+                    setting={setting}
+                    value={settings[setting.key] as number | null}
+                    busy={saving === setting.key}
+                    isLast={i === group.settings.length - 1}
+                    onSave={(value) =>
+                      save(setting.key as "credit_price_usd", value)
+                    }
+                  />
+                ) : (
+                  <SwitchRow
+                    key={setting.key}
+                    setting={setting}
+                    checked={settings[setting.key as SettingKey] as boolean}
+                    busy={saving === setting.key}
+                    isLast={i === group.settings.length - 1}
+                    onToggle={(value) =>
+                      save(
+                        setting.key as keyof Pick<
+                          TenantSettings,
+                          "models_friendly_names"
+                        >,
+                        value,
+                      )
+                    }
+                  />
+                ),
+              )}
             </div>
           </section>
         ))}

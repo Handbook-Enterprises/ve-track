@@ -4,6 +4,20 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.6.1 — 2026-07-06
+
+### Organization default credit price
+
+Organizations that charge the same credit price across all their apps no longer need to pass `creditPriceUsd` in every integration. Set the price once in the dashboard and every credit event picks it up automatically.
+
+- **New setting: Settings → Credits → Default credit price** — the USD value of one credit for the whole tenant. Stored as nullable `credit_price_usd` on `tenant_settings`; leaving it empty preserves the previous behavior exactly (unpriced credit events contribute zero revenue).
+- **Ingest fallback** — `POST /api/v1/events` now stamps the tenant default onto any event that carries `credits_charged` without `credit_price_usd_at_event`. The price is snapshotted at ingest, so later changes to the default never rewrite historical revenue. An explicit `creditPriceUsd` from the SDK always wins, which is how an app with unique pricing overrides the org default.
+- **Settings API** — `GET/PATCH /api/dashboard/settings` now include `credit_price_usd` (number or null; PATCH validates finite, zero or greater, null clears).
+- No SDK changes. `trackCredits` / `trackUsage` signatures are untouched; `creditPriceUsd` simply became optional in practice for orgs using the default.
+
+### Self-host / migration required
+- Apply migration `0027_tenant_settings_credit_price.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`). It adds the nullable `credit_price_usd` column to `tenant_settings`. No data movement, no behavior change until a tenant sets a value.
+
 ## v0.6.0 — 2026-07-02
 
 ### Credit usage tracking across every dimension
