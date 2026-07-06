@@ -6,6 +6,7 @@ import type { SettingKey, TenantSettings } from "~/types/settings.types";
 
 const DEFAULTS: TenantSettings = {
   models_friendly_names: false,
+  credit_price_usd: null,
 };
 
 export function useSettings() {
@@ -32,17 +33,22 @@ export function useSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const toggle = useCallback(
-    async (key: SettingKey, value: boolean) => {
+  const save = useCallback(
+    async <K extends SettingKey>(
+      key: K,
+      value: TenantSettings[K],
+    ): Promise<boolean> => {
       const previous = settings[key];
       setSettings((s) => ({ ...s, [key]: value }));
       setSaving(key);
       try {
         const data = await SettingsService.update(authFetch, { [key]: value });
         setSettings(data.settings);
+        return true;
       } catch (err) {
         setSettings((s) => ({ ...s, [key]: previous }));
         setError(getErrorMessage(err));
+        return false;
       } finally {
         setSaving(null);
       }
@@ -50,5 +56,5 @@ export function useSettings() {
     [authFetch, settings],
   );
 
-  return { settings, loading, error, saving, toggle, refetch: fetchSettings };
+  return { settings, loading, error, saving, save, refetch: fetchSettings };
 }
