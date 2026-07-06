@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import AccountRow from "./AccountRow";
+import OrgClashAlert from "./OrgClashAlert";
+import { Badge } from "~/components/ui/badge";
 import { providerLabel } from "~/utils/providers";
 import { cn } from "~/lib/utils";
 import type { ProviderGroup, Tracker } from "~/types/tracker.types";
@@ -55,6 +57,15 @@ export default function ProviderTrackerCard({
               {group.accounts.length}{" "}
               {group.accounts.length === 1 ? "account" : "accounts"}
             </span>
+            {group.orgClashIds.size > 0 ? (
+              <Badge
+                variant="warning"
+                className="h-auto px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider"
+              >
+                <TriangleAlert />
+                duplicate org
+              </Badge>
+            ) : null}
             {group.hasError ? (
               <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
             ) : null}
@@ -81,6 +92,13 @@ export default function ProviderTrackerCard({
 
       {open ? (
         <div className="border-t border-foreground/10">
+          {group.orgClashIds.size > 0 ? (
+            <OrgClashAlert
+              provider={group.provider}
+              count={group.orgClashIds.size}
+              className="border-x-0 border-t-0"
+            />
+          ) : null}
           {group.accounts.map((a, i) => (
             <AccountRow
               key={a.id}
@@ -94,6 +112,7 @@ export default function ProviderTrackerCard({
               onUpdateKey={onUpdateKey}
               onDisconnect={onDisconnect}
               onOpen={() => onOpenAccount(a)}
+              orgClash={group.orgClashIds.has(a.id)}
             />
           ))}
         </div>
