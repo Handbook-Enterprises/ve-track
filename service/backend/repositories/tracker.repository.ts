@@ -68,6 +68,22 @@ class TrackerRepository {
     return db.select().from(Tracker).where(eq(Tracker.status, "active"));
   }
 
+  static async fetchFullByTenantProvider(
+    db: DrizzleD1Database,
+    tenant_id: string,
+    provider: string,
+  ) {
+    return (await db
+      .select()
+      .from(Tracker)
+      .where(
+        and(
+          eq(Tracker.tenant_id, tenant_id),
+          eq(Tracker.provider, provider),
+        ),
+      )) as TrackerRow[];
+  }
+
   static async update(
     db: DrizzleD1Database,
     id: string,

@@ -3,8 +3,10 @@ import { Link } from "react-router";
 import { Plug } from "lucide-react";
 import { useTrackers } from "~/hooks/useTrackers";
 import AccountRow from "./AccountRow";
+import OrgClashAlert from "./OrgClashAlert";
 import { AccountRowsSkeleton } from "./tracker-skeletons";
 import { providerLabel } from "~/utils/providers";
+import { detectOrgClashes } from "~/utils/tracker-metric";
 import { isLifetimePreset } from "~/utils/date-range";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 
@@ -34,6 +36,8 @@ export default function ProviderTrackersTab({
     );
   }, [groups, providerKey]);
 
+  const orgClashIds = useMemo(() => detectOrgClashes(accounts), [accounts]);
+
   if (loading && accounts.length === 0) {
     return <AccountRowsSkeleton rows={2} />;
   }
@@ -61,6 +65,13 @@ export default function ProviderTrackersTab({
 
   return (
     <div className="border border-foreground/15 bg-card">
+      {orgClashIds.size > 0 ? (
+        <OrgClashAlert
+          provider={providerKey}
+          count={orgClashIds.size}
+          className="border-x-0 border-t-0"
+        />
+      ) : null}
       {accounts.map((a, i) => (
         <AccountRow
           key={a.id}
@@ -73,6 +84,7 @@ export default function ProviderTrackersTab({
           onSync={sync}
           onUpdateKey={updateKey}
           onDisconnect={disconnect}
+          orgClash={orgClashIds.has(a.id)}
         />
       ))}
     </div>

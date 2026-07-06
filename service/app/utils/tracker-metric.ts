@@ -1,5 +1,22 @@
 import { formatMoney, formatNumber } from "./format";
-import type { TrackerMetrics } from "~/types/tracker.types";
+import type { Tracker, TrackerMetrics } from "~/types/tracker.types";
+
+export const detectOrgClashes = (
+  accounts: Array<Pick<Tracker, "id" | "total_usage_usd">>,
+): Set<string> => {
+  const byTotal = new Map<number, string[]>();
+  for (const a of accounts) {
+    if (a.total_usage_usd == null || a.total_usage_usd <= 0) continue;
+    const list = byTotal.get(a.total_usage_usd) ?? [];
+    list.push(a.id);
+    byTotal.set(a.total_usage_usd, list);
+  }
+  const clashed = new Set<string>();
+  for (const ids of byTotal.values()) {
+    if (ids.length > 1) for (const id of ids) clashed.add(id);
+  }
+  return clashed;
+};
 
 export const WINDOW_LABEL = "Last 28 days";
 
