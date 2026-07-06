@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Crown, Layers, Wallet } from "lucide-react";
+import { Coins, Crown, Layers, Wallet } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
 import { useTenantContext } from "~/context/TenantContext";
 import { useAuthContext } from "~/context/AuthContext";
@@ -11,7 +11,7 @@ import ProviderRanking from "~/components/common/provider-ranking";
 import GettingStartedChecklist from "~/components/common/getting-started-checklist";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChartSkeleton } from "~/components/common/entity-detail-skeleton";
-import { formatMoney } from "~/utils/format";
+import { formatMoney, formatNumber } from "~/utils/format";
 import {
   buildPreset,
   isLifetimePreset,
@@ -43,8 +43,8 @@ const SectionCard = ({
 
 const OverviewSkeleton = () => (
   <>
-    <div className="grid gap-px bg-border sm:grid-cols-3">
-      {Array.from({ length: 3 }).map((_, i) => (
+    <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="bg-card p-5">
           <Skeleton className="h-2.5 w-6" />
           <Skeleton className="mt-3 h-2.5 w-20" />
@@ -139,7 +139,7 @@ export default function OverviewPage() {
         <OverviewSkeleton />
       ) : (
         <>
-      <div className="grid gap-px bg-border sm:grid-cols-3">
+      <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           accent
           marker="01"
@@ -152,13 +152,26 @@ export default function OverviewPage() {
         />
         <StatCard
           marker="02"
+          title="Credits used"
+          value={
+            overview.totals.credits > 0
+              ? formatNumber(overview.totals.credits)
+              : "None"
+          }
+          icon={Coins}
+          description={
+            overview.totals.credits > 0 ? range.label : "no credits tracked yet"
+          }
+        />
+        <StatCard
+          marker="03"
           title="Providers"
           value={providers.length}
           icon={Layers}
           description="active providers"
         />
         <StatCard
-          marker="03"
+          marker="04"
           title="Most expensive"
           value={topProvider?.key ? topProvider.key : "None"}
           icon={Crown}

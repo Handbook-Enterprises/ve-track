@@ -4,6 +4,25 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.6.0 — 2026-07-02
+
+### Credit usage tracking across every dimension
+
+Apps that bill users in credits (via Autumn or any credit system) can now report deductions to ve-track and see credit usage broken down by app, action, user, org, provider, and model — everywhere cost already shows.
+
+- **New SDK API `trackCredits(input)`** — call it after your billing call (e.g. Autumn's `track`) succeeds. Emits a standalone credit event (`provider: "autumn"` by default, overridable) that inherits the scope's app, user, org, and action. Silent no-op outside a scope.
+- **`trackUsage` now accepts `creditsCharged` and `creditPriceUsd`** so a credit deduction can ride on the same event as the provider call that caused it, feeding the profitability endpoints.
+- **All usage aggregations return `credits`** — `GET /api/v1/usage/by-app|by-org|by-user|by-provider|by-model|by-action`, `usage/totals`, the daily series, and the dashboard overview each sum `credits_charged` per group. The dashboard shows a Credits column on every entity table, a Credits headline stat in entity detail sheets, and a "Credits used" card on Overview.
+- **Profitability now supports `by=model`** in addition to app/action/org/user/provider.
+
+### `credit_pricing` renamed to `credits`
+
+The `credit_pricing` table and its `CreditPricing` model were renamed: model file is now `backend/models/credit.model.ts` exporting `Credit`, table is `credits`, index is `idx_credits_lookup`.
+
+### Self-host / migration required
+- Apply migration `0026_rename_credit_pricing_to_credits.sql` — `cd service && wrangler d1 migrations apply ve-track-db --remote` (and `--local`). It renames `credit_pricing` to `credits` and recreates the lookup index. No data movement; the table has no runtime readers yet.
+- The SDK change is additive: existing integrations keep working without changes. Bump `@viewengine/track` in your apps to get `trackCredits`.
+
 ## v0.5.5 — 2026-06-20
 
 ### Tracker cost moved out of usage_events into its own table

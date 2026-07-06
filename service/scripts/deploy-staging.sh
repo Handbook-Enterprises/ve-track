@@ -27,8 +27,15 @@ config.d1_databases = [
   },
 ];
 
+const STAGING_QUEUE = 've-track-tracker-sync-staging';
+(config.queues && config.queues.producers || []).forEach(function (p) { p.queue = STAGING_QUEUE; });
+(config.queues && config.queues.consumers || []).forEach(function (c) { c.queue = STAGING_QUEUE; });
+
 fs.writeFileSync('build/server/wrangler.json', JSON.stringify(config, null, 2));
 "
+
+echo "Ensuring staging queue exists..."
+bunx wrangler queues create ve-track-tracker-sync-staging 2>/dev/null || true
 
 echo "Applying D1 migrations to staging..."
 bunx wrangler d1 migrations apply DB --remote --config build/server/wrangler.json

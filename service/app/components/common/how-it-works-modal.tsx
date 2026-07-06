@@ -103,13 +103,13 @@ const CONCEPTS: Concept[] = [
 ];
 
 const TITLES: Record<Step, string> = {
-  intent: "Welcome to VE Rank",
+  intent: "Welcome to VE Track",
   primer: "Your dashboard in sixty seconds",
 };
 
 const DESCRIPTIONS: Record<Step, string> = {
   intent:
-    "VE Rank shows you exactly where your AI spend goes. Tell us how you want to start.",
+    "VE Track shows you exactly where your AI spend goes. Tell us how you want to start.",
   primer: "Six words you will see everywhere. Here is what each one means.",
 };
 

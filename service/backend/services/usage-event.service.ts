@@ -20,7 +20,8 @@ type ProfitabilityDimension =
   | "action"
   | "clerk_org_id"
   | "clerk_user_id"
-  | "provider";
+  | "provider"
+  | "model";
 
 const PROFITABILITY_DIM_MAP: Record<string, ProfitabilityDimension> = {
   app: "app",
@@ -30,6 +31,7 @@ const PROFITABILITY_DIM_MAP: Record<string, ProfitabilityDimension> = {
   user: "clerk_user_id",
   clerk_user_id: "clerk_user_id",
   provider: "provider",
+  model: "model",
 };
 
 const resolveProfitabilityDim = (raw?: string): ProfitabilityDimension => {
@@ -277,6 +279,7 @@ class UsageEventService {
     return rows.map((r) => ({
       day: r.day,
       cost_usd: Number(r.cost_usd ?? 0),
+      credits: Number(r.credits ?? 0),
       requests: Number(r.requests ?? 0),
     }));
   }
@@ -433,9 +436,16 @@ class UsageEventService {
         cost_usd: acc.cost_usd + (g.cost_usd ?? 0),
         prompt_tokens: acc.prompt_tokens + (g.prompt_tokens ?? 0),
         completion_tokens: acc.completion_tokens + (g.completion_tokens ?? 0),
+        credits: acc.credits + (g.credits ?? 0),
         requests: acc.requests + (g.requests ?? 0),
       }),
-      { cost_usd: 0, prompt_tokens: 0, completion_tokens: 0, requests: 0 },
+      {
+        cost_usd: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        credits: 0,
+        requests: 0,
+      },
     );
     return {
       success: true,

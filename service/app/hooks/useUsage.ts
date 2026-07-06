@@ -11,6 +11,7 @@ const EMPTY_OVERVIEW: UsageOverview = {
     cost_usd: 0,
     prompt_tokens: 0,
     completion_tokens: 0,
+    credits: 0,
     requests: 0,
     fromDays: 7,
   },

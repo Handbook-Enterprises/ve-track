@@ -30,6 +30,8 @@ export interface VeTrackEvent {
   latency_ms: number | null;
   cost_usd: number | null;
   status_code: number | null;
+  credits_charged?: number | null;
+  credit_price_usd_at_event?: number | null;
 }
 
 export interface RequestScope {

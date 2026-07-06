@@ -86,7 +86,7 @@ curl -s -X POST https://track.viewengine.ai/api/v1/events \
 
 | Method | Path | Returns |
 |--------|------|---------|
-| GET | `/api/v1/usage/by-app` | cost/tokens/requests grouped by app |
+| GET | `/api/v1/usage/by-app` | cost/tokens/credits/requests grouped by app |
 | GET | `/api/v1/usage/by-org` | grouped by Clerk org |
 | GET | `/api/v1/usage/by-user` | grouped by Clerk user |
 | GET | `/api/v1/usage/by-provider` | grouped by provider |
@@ -94,7 +94,7 @@ curl -s -X POST https://track.viewengine.ai/api/v1/events \
 | GET | `/api/v1/usage/by-action` | grouped by action |
 | GET | `/api/v1/usage/totals` | tenant totals + period-over-period delta |
 
-Each group: `{ key, cost_usd, prompt_tokens, completion_tokens, requests, name?, secondary?, imageUrl? }`. Totals add `fromDays` and a `delta { previousCost, pctChange, direction }`.
+Each group: `{ key, cost_usd, prompt_tokens, completion_tokens, credits, requests, name?, secondary?, imageUrl? }`. `credits` sums `credits_charged` across the group's events, so credit usage is queryable for every dimension. Totals add `fromDays` and a `delta { previousCost, pctChange, direction }`.
 
 ```bash
 curl -s "https://track.viewengine.ai/api/v1/usage/by-provider?fromDays=30" \

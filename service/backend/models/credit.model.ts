@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
-const CreditPricing = sqliteTable(
-  "credit_pricing",
+const Credit = sqliteTable(
+  "credits",
   {
     id: text()
       .primaryKey()
@@ -16,7 +16,7 @@ const CreditPricing = sqliteTable(
     created_at: integer().notNull(),
   },
   (t) => ({
-    lookup: index("idx_credit_pricing_lookup").on(
+    lookup: index("idx_credits_lookup").on(
       t.tenant_id,
       t.app,
       t.action,
@@ -25,4 +25,4 @@ const CreditPricing = sqliteTable(
   }),
 );
 
-export default CreditPricing;
+export default Credit;

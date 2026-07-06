@@ -27,8 +27,15 @@ config.d1_databases = [
   },
 ];
 
+const PROD_QUEUE = 've-track-tracker-sync-prod';
+(config.queues && config.queues.producers || []).forEach(function (p) { p.queue = PROD_QUEUE; });
+(config.queues && config.queues.consumers || []).forEach(function (c) { c.queue = PROD_QUEUE; });
+
 fs.writeFileSync('build/server/wrangler.json', JSON.stringify(config, null, 2));
 "
+
+echo "Ensuring production queue exists..."
+bunx wrangler queues create ve-track-tracker-sync-prod 2>/dev/null || true
 
 echo "Applying D1 migrations to production..."
 bunx wrangler d1 migrations apply DB --remote --config build/server/wrangler.json
