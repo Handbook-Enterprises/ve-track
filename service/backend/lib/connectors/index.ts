@@ -25,6 +25,7 @@ export interface PullContext {
 export interface ConnectorAdapter {
   validate(key: string): Promise<ValidateResult>;
   pull(key: string, ctx?: PullContext): Promise<TrackerResult>;
+  sameAccount?(keyA: string, keyB: string): Promise<boolean | null>;
 }
 
 export const CONNECTOR_PROVIDERS = [
@@ -157,6 +158,23 @@ const anthropicHeaders = (key: string) => ({
   "anthropic-version": "2023-06-01",
 });
 
+async function anthropicOrg(
+  key: string,
+): Promise<{ id: string; name: string | null } | null> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/organizations/me", {
+      headers: anthropicHeaders(key),
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const id = data?.id;
+    if (!id) return null;
+    return { id: String(id), name: data?.name ? String(data.name) : null };
+  } catch {
+    return null;
+  }
+}
+
 const anthropic: ConnectorAdapter = {
   async validate(key) {
     const starting = new Date(Date.now() - DAY_MS).toISOString();
@@ -176,7 +194,18 @@ const anthropic: ConnectorAdapter = {
             : `Anthropic rejected the key (${res.status}).`,
       };
     }
-    return { ok: true, dedupId: await sha256Hex(`anthropic:${key}`) };
+    const org = await anthropicOrg(key);
+    return {
+      ok: true,
+      dedupId: org?.id ?? (await sha256Hex(`anthropic:${key}`)),
+      accountRef: org?.name ?? null,
+    };
+  },
+
+  async sameAccount(keyA, keyB) {
+    const [a, b] = await Promise.all([anthropicOrg(keyA), anthropicOrg(keyB)]);
+    if (!a || !b) return null;
+    return a.id === b.id;
   },
 
   async pull(key, ctx) {
@@ -227,6 +256,42 @@ async function anthropicSum(key: string, startingAtIso: string): Promise<number>
 
 // ===== OpenRouter =====
 
+async function openrouterKeyHashes(key: string): Promise<Set<string> | null> {
+  try {
+    const res = await fetch(
+      "https://openrouter.ai/api/v1/keys?include_disabled=true",
+      { headers: { Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const hashes = new Set<string>();
+    for (const k of data?.data ?? []) {
+      if (k?.hash) hashes.add(String(k.hash));
+    }
+    return hashes;
+  } catch {
+    return null;
+  }
+}
+
+async function openrouterCreditTotals(
+  key: string,
+): Promise<{ credits: number; usage: number } | null> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/credits", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const credits = Number(data?.data?.total_credits);
+    const usage = Number(data?.data?.total_usage);
+    if (!Number.isFinite(credits) || !Number.isFinite(usage)) return null;
+    return { credits, usage };
+  } catch {
+    return null;
+  }
+}
+
 const openrouter: ConnectorAdapter = {
   async validate(key) {
     const res = await fetch("https://openrouter.ai/api/v1/credits", {
@@ -243,6 +308,24 @@ const openrouter: ConnectorAdapter = {
       };
     }
     return { ok: true, dedupId: await sha256Hex(`openrouter:${key}`) };
+  },
+
+  async sameAccount(keyA, keyB) {
+    const [hashesA, hashesB] = await Promise.all([
+      openrouterKeyHashes(keyA),
+      openrouterKeyHashes(keyB),
+    ]);
+    if (hashesA?.size && hashesB?.size) {
+      for (const h of hashesA) if (hashesB.has(h)) return true;
+      return false;
+    }
+    const [a, b] = await Promise.all([
+      openrouterCreditTotals(keyA),
+      openrouterCreditTotals(keyB),
+    ]);
+    if (!a || !b) return null;
+    if (a.credits === 0 && a.usage === 0) return null;
+    return a.credits === b.credits && a.usage === b.usage;
   },
 
   async pull(key) {

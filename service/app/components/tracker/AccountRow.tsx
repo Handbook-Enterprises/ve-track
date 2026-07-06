@@ -5,6 +5,7 @@ import {
   MoreVertical,
   RefreshCw,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { ButtonElement } from "~/components/elements";
+import { Badge } from "~/components/ui/badge";
 import EditKeyDialog from "./EditKeyDialog";
 import { providerLabel } from "~/utils/providers";
 import { formatRelativeTime } from "~/utils/format";
@@ -42,6 +44,7 @@ export default function AccountRow({
   onUpdateKey,
   onDisconnect,
   onOpen,
+  orgClash = false,
 }: {
   account: Tracker;
   provider: string;
@@ -53,6 +56,7 @@ export default function AccountRow({
   onUpdateKey: (id: string, apiKey: string) => Promise<unknown>;
   onDisconnect: (id: string) => void;
   onOpen?: () => void;
+  orgClash?: boolean;
 }) {
   const ok = account.status === "active";
   const primary = primaryMetric(account);
@@ -81,9 +85,20 @@ export default function AccountRow({
     >
       <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-[12px]">
-          {account.account_ref ?? `Account ····${account.key_last4}`}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-mono text-[12px]">
+            {account.account_ref ?? `Account ····${account.key_last4}`}
+          </p>
+          {orgClash ? (
+            <Badge
+              variant="warning"
+              className="h-auto shrink-0 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider"
+            >
+              <TriangleAlert />
+              same org
+            </Badge>
+          ) : null}
+        </div>
         <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
           key ····{account.key_last4} ·{" "}
           {account.last_synced_at
@@ -166,8 +181,8 @@ export default function AccountRow({
               <AlertDialogTitle>Disconnect this account?</AlertDialogTitle>
               <AlertDialogDescription>
                 We stop pulling new cost from this {providerLabel(provider)}{" "}
-                account and delete the stored key. Spend already pulled stays on
-                your dashboard.
+                account, delete the stored key, and remove the spend this
+                account pulled from your dashboard totals.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
