@@ -125,6 +125,7 @@ export default function EntityDetailSheet({
   const totals = overview?.totals;
   const cost = totals?.cost_usd ?? 0;
   const calls = totals?.requests ?? 0;
+  const credits = totals?.credits ?? 0;
   const avg = calls > 0 ? cost / calls : 0;
   const title = entity ? config.label(entity) : "";
   const tabs = config.related.map((id) => DIMENSIONS[id]);
@@ -156,7 +157,7 @@ export default function EntityDetailSheet({
           {loading ? (
             <DetailStatsSkeleton />
           ) : (
-            <div className="grid grid-cols-3 gap-px bg-border">
+            <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
               <HeadlineStat label="Spend" value={formatMoney(cost)} accent />
               <HeadlineStat
                 label="Avg/call"
@@ -165,6 +166,10 @@ export default function EntityDetailSheet({
               <HeadlineStat
                 label="Calls"
                 value={calls > 0 ? formatNumber(calls) : "—"}
+              />
+              <HeadlineStat
+                label="Credits"
+                value={credits > 0 ? formatNumber(credits) : "—"}
               />
             </div>
           )}

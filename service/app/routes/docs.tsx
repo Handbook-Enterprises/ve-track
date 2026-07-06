@@ -259,6 +259,24 @@ export default function Docs(_props: Route.ComponentProps) {
                 language="ts"
                 code={`import { trackUsage } from "@viewengine/track";\n\nconst res = await fetch("https://api.some-provider.com/run", { ... });\nconst body = await res.json();\n\ntrackUsage({\n  provider: "some-provider",\n  costUsd: body.cost,\n  model: body.model,\n  promptTokens: body.usage?.input,\n  completionTokens: body.usage?.output,\n  statusCode: res.status,\n});`}
               />
+              <H3>Credits</H3>
+              <P>
+                Billing your users in credits through Autumn or another credit system? Report
+                every deduction with <C>trackCredits</C> and the dashboard breaks credit usage
+                down by app, action, user, org, provider, and model, right next to cost. Call
+                it after your billing call succeeds. Like <C>trackUsage</C>, it inherits the
+                scope's app, user, org, and action, and it is a silent no op outside a scope.
+              </P>
+              <CodeBlock
+                language="ts"
+                code={`import { trackCredits } from "@viewengine/track";\n\nconst result = await autumn.track({\n  customerId: user.id,\n  featureId: "ai_search",\n  value: 3,\n});\n\ntrackCredits({\n  credits: 3,\n  action: "ai_search",\n});`}
+              />
+              <P>
+                To attach credits to the same row as the provider call that caused them, pass{" "}
+                <C>creditsCharged</C> (and optionally <C>creditPriceUsd</C>) to{" "}
+                <C>trackUsage</C> instead. That keeps the deduction on the usage event and
+                powers the profitability view.
+              </P>
             </Section>
 
             <Section id="configuration" index={5} title="Configuration">
