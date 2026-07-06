@@ -1,4 +1,10 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { timestamps } from "../utils";
 
 const TenantSettings = sqliteTable(
@@ -11,6 +17,7 @@ const TenantSettings = sqliteTable(
     models_friendly_names: integer({ mode: "boolean" })
       .notNull()
       .default(false),
+    credit_price_usd: real(),
     ...timestamps,
   },
   (t) => ({

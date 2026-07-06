@@ -277,6 +277,13 @@ export default function Docs(_props: Route.ComponentProps) {
                 <C>trackUsage</C> instead. That keeps the deduction on the usage event and
                 powers the profitability view.
               </P>
+              <P>
+                Charging the same credit price across all your apps? Set a default once in{" "}
+                <C>Settings → Credits</C> and skip <C>creditPriceUsd</C> everywhere. Credit
+                events that arrive without a price pick up the default at ingest. Pass{" "}
+                <C>creditPriceUsd</C> only in an app with its own unique pricing, since an
+                explicit value always wins over the default.
+              </P>
             </Section>
 
             <Section id="configuration" index={5} title="Configuration">
