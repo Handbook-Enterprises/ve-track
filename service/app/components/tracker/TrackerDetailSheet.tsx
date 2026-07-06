@@ -130,6 +130,7 @@ export default function TrackerDetailSheet({
   const chartData = (detail?.series ?? []).map((p) => ({
     day: p.day,
     cost_usd: p.value,
+    credits: 0,
     requests: 0,
   }));
 

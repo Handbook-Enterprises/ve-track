@@ -30,6 +30,7 @@ const fillSeries = (
     out.push({
       day: key,
       cost_usd: hit?.cost_usd ?? 0,
+      credits: hit?.credits ?? 0,
       requests: hit?.requests ?? 0,
     });
   }
