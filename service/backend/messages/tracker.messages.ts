@@ -10,4 +10,6 @@ export const TrackerMessages = {
   UNSUPPORTED_PROVIDER: "That provider is not supported yet.",
   VALIDATION_ERROR: "Provide a provider and an API key.",
   DUPLICATE: "You are already tracking costs from this provider account.",
+  sameOrg: (provider: string, accountRef: string) =>
+    `This key belongs to the same ${provider} organization as ${accountRef}, which you already track. Both keys report the one organization total, so adding it would count that spend twice.`,
 };

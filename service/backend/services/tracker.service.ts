@@ -135,6 +135,11 @@ const publicTracker = (t: any) => ({
   updated_at: t.updated_at,
 });
 
+const accountLabel = (t: {
+  account_ref: string | null;
+  key_last4: string;
+}): string => t.account_ref ?? `acct ····${t.key_last4}`;
+
 const requireSecret = (env: Env): string => {
   if (!env.CONNECTOR_ENC_KEY) {
     throw new CustomError(
@@ -146,6 +151,46 @@ const requireSecret = (env: Env): string => {
 };
 
 class TrackerService {
+  private static async assertNoSameOrgClash(
+    db: DrizzleD1Database,
+    secret: string,
+    tenantId: string,
+    provider: string,
+    apiKey: string,
+    excludeId?: string,
+  ) {
+    const adapter = getAdapter(provider);
+    if (!adapter?.sameAccount) return;
+    const existing = await TrackerRepository.fetchFullByTenantProvider(
+      db,
+      tenantId,
+      provider,
+    );
+    for (const tracker of existing) {
+      if (tracker.id === excludeId) continue;
+      try {
+        const existingKey = await openApiKey(secret, tenantId, tracker);
+        const clash = await adapter.sameAccount(apiKey, existingKey);
+        if (clash === true) {
+          throw new DuplicateError(
+            TrackerMessages.sameOrg(
+              labelFor(provider),
+              accountLabel(tracker),
+            ),
+            HTTP_STATUS_CODES.FORBIDDEN,
+          );
+        }
+      } catch (err) {
+        if (err instanceof DuplicateError) throw err;
+        console.warn(
+          "[ve-track][tracker] same org check skipped",
+          tracker.id,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
   static async listForTenant(
     db: DrizzleD1Database,
     tenantId: string,
@@ -329,6 +374,8 @@ class TrackerService {
       );
     }
 
+    await this.assertNoSameOrgClash(db, secret, tenantId, provider, apiKey);
+
     const accountRef = validation.accountRef ?? `acct ····${lastFour(apiKey)}`;
     const sealed = await sealApiKey(secret, tenantId, apiKey);
     const created = await TrackerRepository.create(db, {
@@ -467,6 +514,15 @@ class TrackerService {
         HTTP_STATUS_CODES.FORBIDDEN,
       );
     }
+
+    await this.assertNoSameOrgClash(
+      db,
+      secret,
+      tenantId,
+      tracker.provider,
+      apiKey,
+      id,
+    );
 
     const accountRef = validation.accountRef ?? `acct ····${lastFour(apiKey)}`;
     const sealed = await sealApiKey(secret, tenantId, apiKey);

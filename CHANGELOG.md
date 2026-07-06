@@ -4,6 +4,18 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.6.2 — 2026-07-06
+
+### Provider organization duplicate detection for trackers
+
+Providers like OpenRouter and Anthropic report spend for the whole organization, not per key. Multiple keys from one organization each pulled the identical org total and inflated the tenant's provider spend by that multiple. Trackers now detect and block same org keys, and flag duplicates that already exist.
+
+- **Same org check on connect and key update** — `TrackerService.create` and `updateKey` now run an adapter level `sameAccount` comparison against every existing tracker for that provider in the tenant. OpenRouter compares the provisioning key's org key list (`GET /api/v1/keys` hash overlap) and falls back to an exact `total_credits` + `total_usage` fingerprint from `GET /api/v1/credits` fetched with both keys at the same moment. A confirmed match is rejected with a message naming the account it clashes with. The check is best effort: provider errors skip the comparison instead of blocking the add.
+- **Anthropic gets a real org identity** — `validate` now calls `GET /v1/organizations/me`, so the dedup hash is the organization id (a second admin key from the same org is rejected outright) and `account_ref` becomes the organization name instead of `acct ····last4`.
+- **Dashboard duplicate flag** — provider groups whose accounts report an identical nonzero lifetime total show a "duplicate org" badge, a warning alert explaining the double counting, and a "same org" badge on each affected account row. This catches duplicates connected before this release.
+- **Disconnect copy corrected** — the confirm dialog claimed pulled spend stays after disconnecting; it is actually removed along with the tracker's snapshots, which is the intended cleanup path for duplicate org keys.
+- No SDK changes, no migration. Existing trackers keep working; cleanup of already connected duplicates is a manual disconnect per extra key.
+
 ## v0.6.1 — 2026-07-06
 
 ### Organization default credit price

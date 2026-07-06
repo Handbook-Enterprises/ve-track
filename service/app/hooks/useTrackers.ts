@@ -3,7 +3,11 @@ import { toast } from "sonner";
 import { useAuthContext } from "~/context/AuthContext";
 import { TrackerService } from "~/services/tracker.service";
 import { getErrorMessage } from "~/utils";
-import { primaryMetric, formatMetric } from "~/utils/tracker-metric";
+import {
+  primaryMetric,
+  formatMetric,
+  detectOrgClashes,
+} from "~/utils/tracker-metric";
 import type { DateRange, RangePresetId } from "~/utils/date-range";
 import type {
   ProviderGroup,
@@ -49,6 +53,7 @@ const groupByProvider = (
         metricValue: formatMetric(total, isMoney),
         distinctOrgs,
         hasError: accounts.some((a) => a.status === "error"),
+        orgClashIds: detectOrgClashes(accounts),
       };
     })
     .sort((a, b) => b.totalCost - a.totalCost);

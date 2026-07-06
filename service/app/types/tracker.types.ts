@@ -40,6 +40,7 @@ export interface ProviderGroup {
   metricValue: string;
   distinctOrgs: number;
   hasError: boolean;
+  orgClashIds: Set<string>;
 }
 
 export interface TrackersListResponse {
