@@ -9,6 +9,26 @@ export function formatMoney(n: number | null | undefined): string {
   })}`;
 }
 
+export function formatPreciseMoney(
+  n: number | null | undefined,
+  maxFractionDigits = 4,
+): string {
+  const num = Number(n ?? 0);
+  if (!Number.isFinite(num)) return "$0.00";
+  return `$${num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxFractionDigits,
+  })}`;
+}
+
+export function formatShare(value: number, total: number): string {
+  if (total <= 0) return "—";
+  const pct = (value / total) * 100;
+  if (pct >= 10) return `${Math.round(pct)}%`;
+  if (pct >= 1) return `${pct.toFixed(1)}%`;
+  return "<1%";
+}
+
 export function formatNumber(n: number | null | undefined): string {
   const num = Number(n ?? 0);
   if (!Number.isFinite(num)) return "0";

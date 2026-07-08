@@ -37,7 +37,7 @@ const fillSeries = (
   return out;
 };
 
-function EmptyGraph({
+export function EmptyGraph({
   title,
   hint,
 }: {

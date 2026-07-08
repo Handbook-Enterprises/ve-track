@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router";
 import {
   Activity,
   Building2,
+  Coins,
   Cpu,
   HelpCircle,
   KeyRound,
@@ -31,6 +32,7 @@ import { useOnboarding } from "~/context/OnboardingContext";
 
 const NAV = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Credits", url: "/dashboard/credits", icon: Coins },
   { title: "API Keys", url: "/dashboard/keys", icon: KeyRound },
   { title: "Providers", url: "/dashboard/usage", icon: Activity },
   { title: "Models", url: "/dashboard/models", icon: Cpu },

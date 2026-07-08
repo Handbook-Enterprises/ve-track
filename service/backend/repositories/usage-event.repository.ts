@@ -267,6 +267,25 @@ class UsageEventRepository {
       );
   }
 
+  static async profitabilityDailySeries(
+    db: DrizzleD1Database,
+    filters: BaseFilters,
+  ) {
+    const day = sql<string>`strftime('%Y-%m-%d', ${UsageEvent.timestamp} / 1000, 'unixepoch')`;
+    return db
+      .select({
+        day,
+        cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
+        revenue_usd: sql<number>`COALESCE(SUM(COALESCE(${UsageEvent.credits_charged}, 0) * COALESCE(${UsageEvent.credit_price_usd_at_event}, 0)), 0)`,
+        credits: sql<number>`COALESCE(SUM(${UsageEvent.credits_charged}), 0)`,
+        requests: sql<number>`COUNT(*)`,
+      })
+      .from(UsageEvent)
+      .where(buildWhere(filters))
+      .groupBy(day)
+      .orderBy(day);
+  }
+
   static async profitabilityTotals(
     db: DrizzleD1Database,
     filters: BaseFilters,

@@ -83,6 +83,7 @@ export interface ProfitabilityGroup {
   requests: number;
   name?: string | null;
   secondary?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface ProfitabilityTotals {
@@ -93,4 +94,36 @@ export interface ProfitabilityTotals {
   credits_charged: number;
   requests: number;
   fromDays: number;
+}
+
+export interface ProfitabilitySeriesPoint {
+  day: string;
+  revenue_usd: number;
+  cost_usd: number;
+  margin_usd: number;
+  credits: number;
+  requests: number;
+}
+
+export interface CreditsDeltas {
+  revenue?: UsageDelta;
+  cost?: UsageDelta;
+  credits?: UsageDelta;
+}
+
+export interface CreditsTotals extends ProfitabilityTotals {
+  deltas?: CreditsDeltas;
+}
+
+export interface CreditsOverview {
+  fromDays: number;
+  creditPriceUsd: number | null;
+  totals: CreditsTotals;
+  series: ProfitabilitySeriesPoint[];
+  byApp: ProfitabilityGroup[];
+  byAction: ProfitabilityGroup[];
+  byUser: ProfitabilityGroup[];
+  byOrg: ProfitabilityGroup[];
+  byProvider: ProfitabilityGroup[];
+  byModel: ProfitabilityGroup[];
 }

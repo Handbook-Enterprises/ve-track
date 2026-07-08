@@ -3,7 +3,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import IdentityCell from "./identity-cell";
 import { cn } from "~/lib/utils";
-import { formatMoney, formatNumber } from "~/utils/format";
+import { formatMoney, formatNumber, formatShare } from "~/utils/format";
 import type { EntityConfig } from "~/utils/entity-dimensions";
 import type { UsageGroup } from "~/types/usage.types";
 
@@ -13,14 +13,6 @@ interface Props {
   totalCost: number;
   onSelect?: (row: UsageGroup) => void;
 }
-
-const formatShare = (cost: number, total: number): string => {
-  if (total <= 0) return "—";
-  const pct = (cost / total) * 100;
-  if (pct >= 10) return `${Math.round(pct)}%`;
-  if (pct >= 1) return `${pct.toFixed(1)}%`;
-  return "<1%";
-};
 
 export default function EntityTable({
   config,

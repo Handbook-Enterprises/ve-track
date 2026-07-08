@@ -4,6 +4,17 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.7.0 — 2026-07-07
+
+### Credits economics dashboard
+
+The dashboard now answers the money question directly: are your credits priced above what they cost you. A new Credits tab shows revenue (credits charged × price at event) against actual provider cost across every dimension, plus the unit numbers needed to price credits and size free signup grants.
+
+- **New Credits tab** — headline stats (Revenue, Provider cost, Margin, Credits charged, each with prior window deltas), a daily revenue vs cost chart where the gap between the two areas is your margin, and a breakdown across Apps, Actions, People, Organizations, Providers, and Models with revenue, cost, margin, and margin percent per row.
+- **Unit economics panel** — per credit figures: realized average price, blended cost per credit (your break even price), margin kept per credit, markup over your configured default price, users charged credits, and average/median credits per user normalized to a month. Includes a free signup credit calculator: enter a grant size and see what it costs you per signup at your current cost per credit.
+- **New endpoint `GET /api/dashboard/credits`** (Clerk authed, tenant scoped) — aggregated profitability totals, deltas, daily series, and six dimension breakdowns in one call. Headline cost blends connected tracker billing the same way Overview does, while revenue and credits always come from SDK events; per dimension tables use SDK event cost only, since tracker spend has no app or action dimension.
+- No SDK changes, no migration.
+
 ## v0.6.2 — 2026-07-06
 
 ### Provider organization duplicate detection for trackers
