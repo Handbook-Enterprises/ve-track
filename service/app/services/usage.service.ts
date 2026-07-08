@@ -7,7 +7,7 @@ import type {
 
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
 
-const buildQuery = (filters?: UsageQueryFilters): string => {
+export const buildQuery = (filters?: UsageQueryFilters): string => {
   if (!filters) return "";
   const params = new URLSearchParams();
   if (filters.from != null) params.set("from", String(filters.from));
