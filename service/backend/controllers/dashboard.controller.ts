@@ -146,6 +146,16 @@ class DashboardController {
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
 
+  static async creditsController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      DashboardService.getCredits(db, c.env, tenantId, c.req.query() as UsageQuery),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
   static async canaryController(c: DashContext) {
     const db = drizzle(c.env.DB);
     const tenantId = c.get("tenantId");

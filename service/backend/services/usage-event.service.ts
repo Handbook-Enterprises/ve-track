@@ -40,7 +40,7 @@ const resolveProfitabilityDim = (raw?: string): ProfitabilityDimension => {
   return PROFITABILITY_DIM_MAP[raw] ?? "action";
 };
 
-const computeMargin = (revenue: number, cost: number) => {
+export const computeMargin = (revenue: number, cost: number) => {
   const margin_usd = revenue - cost;
   const margin_pct = revenue > 0 ? (margin_usd / revenue) * 100 : null;
   return { margin_usd, margin_pct };
@@ -410,6 +410,56 @@ class UsageEventService {
       success: true,
       message: UsageEventMessages.FETCH_SUCCESS,
       totals,
+    };
+  }
+
+  static async getProfitabilitySeries(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query: UsageQuery,
+    excludeProviders?: string[],
+  ) {
+    const window = resolveWindow(query);
+    const rows = await UsageEventRepository.profitabilityDailySeries(
+      db,
+      baseFilters(tenantId, query, window, excludeProviders),
+    );
+    return rows.map((r) => ({
+      day: r.day,
+      revenue_usd: Number(r.revenue_usd ?? 0),
+      cost_usd: Number(r.cost_usd ?? 0),
+      credits: Number(r.credits ?? 0),
+      requests: Number(r.requests ?? 0),
+    }));
+  }
+
+  static async getProfitabilityWindowTotals(
+    db: DrizzleD1Database,
+    tenantId: string,
+    query: UsageQuery,
+    excludeProviders?: string[],
+  ) {
+    const window = resolveWindow(query);
+    const filters = baseFilters(tenantId, query, window, excludeProviders);
+    const previousFilters = {
+      ...filters,
+      fromTs: filters.fromTs - window.fromDays * DAY_MS,
+      toTs: filters.fromTs,
+    };
+    const [current, previous] = await Promise.all([
+      UsageEventRepository.profitabilityTotals(db, filters),
+      UsageEventRepository.profitabilityTotals(db, previousFilters),
+    ]);
+    const normalize = (row: typeof current) => ({
+      revenue_usd: Number(row.revenue_usd ?? 0),
+      cost_usd: Number(row.cost_usd ?? 0),
+      credits_charged: Number(row.credits_charged ?? 0),
+      requests: Number(row.requests ?? 0),
+    });
+    return {
+      current: normalize(current),
+      previous: normalize(previous),
+      window,
     };
   }
 

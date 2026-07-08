@@ -15,6 +15,7 @@ export default [
 
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/overview.tsx", { id: "dashboard-overview" }),
+    route("dashboard/credits", "routes/dashboard/credits.tsx", { id: "dashboard-credits" }),
     route("dashboard/keys", "routes/dashboard/keys.tsx", { id: "dashboard-keys" }),
     route("dashboard/usage", "routes/dashboard/usage.tsx", { id: "dashboard-usage" }),
     route("dashboard/models", "routes/dashboard/models.tsx", { id: "dashboard-models" }),
