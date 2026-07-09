@@ -15,3 +15,13 @@ export interface ActionUpdateBody {
   credits_per_call?: number | null;
   status?: string;
 }
+
+export interface ActionRenameBody {
+  slug?: string;
+  name?: string;
+}
+
+export interface ActionMergeBody {
+  from?: string;
+  into?: string;
+}

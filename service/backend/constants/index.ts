@@ -1,5 +1,7 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+export const NULL_FILTER = "__none__";
+
 export const HTTP_STATUS_CODES = {
   SUCCESS: 200 as ContentfulStatusCode,
   NO_CONTENT: 204 as ContentfulStatusCode,

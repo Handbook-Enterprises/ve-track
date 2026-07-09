@@ -10,6 +10,7 @@ interface Props {
   emptyLabel?: string;
   fallbackLabel?: string;
   limit?: number;
+  nullable?: boolean;
   onSelect?: (group: UsageGroup) => void;
 }
 
@@ -28,6 +29,7 @@ export default function DimensionList({
   emptyLabel = "Untagged",
   fallbackLabel = "Unknown",
   limit = 12,
+  nullable = false,
   onSelect,
 }: Props) {
   const rows = groups
@@ -47,7 +49,7 @@ export default function DimensionList({
       {rows.map((g, i) => {
         const pct = totalCost > 0 ? (g.cost_usd / totalCost) * 100 : 0;
         const isTop = i === 0;
-        const clickable = onSelect != null && g.key != null;
+        const clickable = onSelect != null && (g.key != null || nullable);
         return (
           <li
             key={`${g.key ?? "null"}-${i}`}
@@ -97,7 +99,7 @@ export default function DimensionList({
                     isTop ? "font-semibold" : "font-medium",
                   )}
                 >
-                  {g.key || emptyLabel}
+                  {g.name || g.key || emptyLabel}
                 </p>
               )}
               <div className="mt-1.5 h-1 w-full overflow-hidden bg-muted">

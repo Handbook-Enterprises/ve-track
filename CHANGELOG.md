@@ -4,6 +4,18 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.8.0 — 2026-07-09
+
+### Action management and unattributed drill downs
+
+When an action name changes in code, its history splits in two and the dashboard cannot tell you what anything really cost. Actions are now manageable: rename what you see without touching code, and merge a mistakenly renamed action back into one line. Unattributed segments (events sent without an action, model, user, or org) are now first class citizens you can open and audit like any other row.
+
+- **Rename actions** — every action row (Actions table and detail sheet) has a menu with Rename. The display name is what reports show; the slug your code sends stays the permanent id and is displayed beneath the name. Stored in the existing `actions` registry, applied at read time across Overview and Credits.
+- **Merge actions** — the same menu offers Merge into another action: pick a target from a searchable list, review exactly how many calls and how much spend will move, then confirm. The merge retags the historical `usage_events` rows in one statement and records an alias, so future events arriving with the old slug are recorded under the target automatically at ingest. The rewrite is permanent; the confirm step says so before anything happens.
+- **New endpoints** `PATCH /api/dashboard/actions/rename` (`{ slug, name }`) and `POST /api/dashboard/actions/merge` (`{ from, into }`, returns the retagged row count). Merging into an already merged action is rejected; existing aliases pointing at the merged slug are repointed to the new target.
+- **Unattributed drill downs** — clicking Untagged, Unknown, Anonymous, or Personal / no org now opens a real detail sheet filtered to events where that field is null, honoring the period picker. Previously these rows silently showed the last opened entity's data. The nullable filters (`action`, `model`, `clerk_user_id`, `clerk_org_id`) accept the sentinel `__none__` on all aggregation endpoints.
+- **Migration**: adds nullable `actions.merged_into` (`0028_actions_merged_into.sql`), applied automatically by the deploy scripts. No SDK changes; keep sending raw action slugs.
+
 ## v0.7.0 — 2026-07-07
 
 ### Credits economics dashboard
