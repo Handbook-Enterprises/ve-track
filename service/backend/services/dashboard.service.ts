@@ -5,8 +5,11 @@ import ApiKeyService from "./api-key.service";
 import UsageEventService, {
   computeMargin,
   resolveWindow,
+  type UsageWindow,
 } from "./usage-event.service";
-import TrackerService from "./tracker.service";
+import TrackerService, {
+  type TrackerContribution,
+} from "./tracker.service";
 import SettingsService from "./settings.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
@@ -25,6 +28,38 @@ import type {
   UsageSeriesPoint,
 } from "../interfaces/usage-event.interface";
 import type { Env } from "../types";
+
+const resolveTrackerContribution = async (
+  db: DrizzleD1Database,
+  tenantId: string,
+  window: UsageWindow,
+  lifetime: boolean,
+  query: UsageQuery,
+): Promise<TrackerContribution> => {
+  const dimensionFiltered = !!(
+    query.action ||
+    query.app ||
+    query.model ||
+    query.clerk_user_id ||
+    query.clerk_org_id ||
+    query.correlation_id
+  );
+  if (dimensionFiltered)
+    return {
+      totals: { cost_usd: 0 },
+      previousCost: 0,
+      previousCovered: true,
+      byProvider: new Map(),
+      series: new Map(),
+    };
+  return TrackerService.getOverviewContribution(
+    db,
+    tenantId,
+    window,
+    lifetime,
+    query.provider || undefined,
+  );
+};
 
 const deriveDelta = (previousCost: number, currentCost: number): UsageDelta => {
   let pctChange: number | null = null;
@@ -120,11 +155,12 @@ class DashboardService {
   ) {
     const window = resolveWindow(query);
     const lifetime = query.lifetime === "1" || query.lifetime === "true";
-    const trackerContribution = await TrackerService.getOverviewContribution(
+    const trackerContribution = await resolveTrackerContribution(
       db,
       tenantId,
       window,
       lifetime,
+      query,
     );
     const trackedProviders = [...trackerContribution.byProvider.keys()];
 
@@ -260,11 +296,12 @@ class DashboardService {
   ) {
     const window = resolveWindow(query);
     const lifetime = query.lifetime === "1" || query.lifetime === "true";
-    const trackerContribution = await TrackerService.getOverviewContribution(
+    const trackerContribution = await resolveTrackerContribution(
       db,
       tenantId,
       window,
       lifetime,
+      query,
     );
     const trackedProviders = [...trackerContribution.byProvider.keys()];
 

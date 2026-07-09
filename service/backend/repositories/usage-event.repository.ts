@@ -221,25 +221,13 @@ class UsageEventRepository {
     fromDays: number,
   ) {
     const fromTs = filters.fromTs - fromDays * dayMs;
-    const toTs = filters.fromTs;
-    const conditions = [
-      eq(UsageEvent.tenant_id, filters.tenant_id),
-      gte(UsageEvent.timestamp, fromTs),
-      sql`${UsageEvent.timestamp} < ${toTs}`,
-    ];
-    if (filters.app) conditions.push(eq(UsageEvent.app, filters.app));
-    if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
-    if (filters.clerk_org_id) conditions.push(eq(UsageEvent.clerk_org_id, filters.clerk_org_id));
-    if (filters.clerk_user_id) conditions.push(eq(UsageEvent.clerk_user_id, filters.clerk_user_id));
-    if (filters.excludeProviders && filters.excludeProviders.length > 0)
-      conditions.push(notInArray(UsageEvent.provider, filters.excludeProviders));
     const [row] = await db
       .select({
         cost_usd: sql<number>`COALESCE(SUM(${UsageEvent.cost_usd}), 0)`,
         requests: sql<number>`COUNT(*)`,
       })
       .from(UsageEvent)
-      .where(and(...conditions));
+      .where(buildWhere({ ...filters, fromTs, toTs: filters.fromTs }));
     return row ?? { cost_usd: 0, requests: 0 };
   }
 
