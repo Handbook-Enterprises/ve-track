@@ -1,11 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useUsage } from "~/hooks/useUsage";
+import { useActionAdmin } from "~/hooks/useActionAdmin";
 import { ButtonElement } from "~/components/elements";
 import DateRangePicker from "~/components/common/date-range-picker";
 import EntityTable from "~/components/common/entity-table";
 import EntityTableSkeleton from "~/components/common/entity-table-skeleton";
 import EntityDetailSheet from "~/components/common/entity-detail-sheet";
+import ActionRowMenu from "~/components/action/ActionRowMenu";
+import RenameActionDialog from "~/components/action/RenameActionDialog";
+import MergeActionDialog from "~/components/action/MergeActionDialog";
 import {
   ENTITIES,
   type EntityConfig,
@@ -67,6 +71,45 @@ export default function EntityPage({ config }: Props) {
     [config, overview],
   );
 
+  const [renameTarget, setRenameTarget] = useState<UsageGroup | null>(null);
+  const [mergeSource, setMergeSource] = useState<UsageGroup | null>(null);
+  const { rename, merge } = useActionAdmin(refetch);
+
+  const actionCandidates = useMemo(
+    () =>
+      overview.byAction.filter((g) => g.key != null && g.key !== "canary"),
+    [overview],
+  );
+
+  const handleRename = useCallback(
+    async (slug: string, name: string) => {
+      const ok = await rename(slug, name);
+      if (ok) {
+        setSelected((s) =>
+          s && s.group.key === slug
+            ? { ...s, group: { ...s.group, name } }
+            : s,
+        );
+      }
+      return ok;
+    },
+    [rename],
+  );
+
+  const handleMerge = useCallback(
+    async (from: string, into: string) => {
+      const ok = await merge(from, into);
+      if (ok) {
+        setSheetOpen((wasOpen) => {
+          if (wasOpen && selected?.group.key === from) return false;
+          return wasOpen;
+        });
+      }
+      return ok;
+    },
+    [merge, selected],
+  );
+
   const selectedConfig = selected ? ENTITIES[selected.id] : config;
   const nounLabel = config.noun.replace(/^./, (c) => c.toUpperCase());
 
@@ -120,6 +163,17 @@ export default function EntityPage({ config }: Props) {
           rows={rows}
           totalCost={overview.totals.cost_usd}
           onSelect={(group) => openEntity(config.id, group)}
+          rowActions={
+            config.id === "action"
+              ? (group) => (
+                  <ActionRowMenu
+                    group={group}
+                    onRename={setRenameTarget}
+                    onMerge={setMergeSource}
+                  />
+                )
+              : undefined
+          }
         />
       )}
       {!loading && !error ? (
@@ -138,6 +192,26 @@ export default function EntityPage({ config }: Props) {
         initialRange={range}
         initialPresetId={activePresetId}
         onDrill={openEntity}
+        onRenameAction={setRenameTarget}
+        onMergeAction={setMergeSource}
+      />
+
+      <RenameActionDialog
+        open={renameTarget != null}
+        onOpenChange={(next) => {
+          if (!next) setRenameTarget(null);
+        }}
+        action={renameTarget}
+        onSubmit={handleRename}
+      />
+      <MergeActionDialog
+        open={mergeSource != null}
+        onOpenChange={(next) => {
+          if (!next) setMergeSource(null);
+        }}
+        source={mergeSource}
+        candidates={actionCandidates}
+        onSubmit={handleMerge}
       />
     </div>
   );

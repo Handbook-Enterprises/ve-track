@@ -14,6 +14,7 @@ const Action = sqliteTable(
     description: text(),
     credits_per_call: real(),
     status: text().notNull().default("active"),
+    merged_into: text(),
     ...timestamps,
   },
   (t) => ({

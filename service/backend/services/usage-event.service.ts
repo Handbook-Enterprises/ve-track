@@ -1,5 +1,6 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { UsageEventRepository } from "../repositories/usage-event.repository";
+import { ActionRepository } from "../repositories/action.repository";
 import PricingService, { REPRICE_PROVIDERS } from "./pricing.service";
 import SettingsService from "./settings.service";
 import { UsageEventMessages } from "../messages/usage-event.messages";
@@ -130,6 +131,15 @@ class UsageEventService {
       defaultCreditPrice = settings.credit_price_usd;
     }
 
+    let mergedActions: Map<string, string> | null = null;
+    if (valid.some((e) => e.action)) {
+      mergedActions = await ActionRepository.fetchMergedMap(db, tenantId);
+    }
+    const resolveAction = (action?: string | null): string | null => {
+      if (!action) return null;
+      return mergedActions?.get(action) ?? action;
+    };
+
     const rows = valid.map((e) => {
       const cachedInput = e.cached_input_tokens ?? 0;
       const cacheWrite = e.cache_write_tokens ?? 0;
@@ -161,7 +171,7 @@ class UsageEventService {
         app: body.app,
         clerk_user_id: e.clerk_user_id ?? null,
         clerk_org_id: e.clerk_org_id ?? null,
-        action: e.action ?? null,
+        action: resolveAction(e.action),
         provider: e.provider,
         model: e.model ?? null,
         prompt_tokens: e.prompt_tokens ?? null,

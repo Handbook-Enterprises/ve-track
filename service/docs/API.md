@@ -43,6 +43,8 @@ All `usage/*` and `breakdown/*` reads accept:
 | `clerk_user_id` | Filter to one user |
 | `action` | Filter to one action label |
 
+The nullable dimensions (`action`, `model`, `clerk_user_id`, `clerk_org_id`) also accept the sentinel value `__none__`, which filters to events where that field was not sent at all. Example: `action=__none__` returns only untagged events; `clerk_user_id=__none__` returns anonymous usage.
+
 ## Endpoints
 
 ### Ingest
@@ -83,6 +85,8 @@ curl -s -X POST https://track.viewengine.ai/api/v1/events \
 ```
 
 If an event carries `credits_charged` but omits `credit_price_usd_at_event`, the tenant's default credit price (dashboard: Settings → Credits) is stamped onto the event at ingest. An explicit `credit_price_usd_at_event` always wins. If no default is set, the price stays `null` and the event contributes zero revenue to profitability.
+
+If the tenant merged an action in the dashboard (Actions → row menu → Merge), events arriving with the merged slug are recorded under the action it was merged into. Send whichever slug your code currently uses; the mapping is applied at ingest.
 
 ### Usage aggregations
 

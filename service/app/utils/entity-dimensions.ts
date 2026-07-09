@@ -7,6 +7,8 @@ import type {
   UsageQueryFilters,
 } from "~/types/usage.types";
 
+export const NULL_FILTER = "__none__";
+
 export type DimensionId =
   | "provider"
   | "model"
@@ -32,6 +34,7 @@ export interface DimensionDef {
   emptyLabel: string;
   fallbackLabel: string;
   filterKey?: keyof UsageQueryFilters;
+  nullable?: boolean;
 }
 
 export interface EntityConfig extends DimensionDef {
@@ -65,6 +68,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
     emptyLabel: "Unknown",
     fallbackLabel: "Unknown",
     filterKey: "model",
+    nullable: true,
   },
   app: {
     id: "app",
@@ -85,6 +89,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
     emptyLabel: "Anonymous",
     fallbackLabel: "Anonymous",
     filterKey: "clerk_user_id",
+    nullable: true,
   },
   org: {
     id: "org",
@@ -95,16 +100,18 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
     emptyLabel: "Personal / no org",
     fallbackLabel: "Personal / no org",
     filterKey: "clerk_org_id",
+    nullable: true,
   },
   action: {
     id: "action",
     tabLabel: "Actions",
     pick: (o) => o.byAction,
     variant: "plain",
-    label: (g) => g.key ?? "Untagged",
+    label: (g) => g.name ?? g.key ?? "Untagged",
     emptyLabel: "Untagged",
     fallbackLabel: "Untagged",
     filterKey: "action",
+    nullable: true,
   },
 };
 

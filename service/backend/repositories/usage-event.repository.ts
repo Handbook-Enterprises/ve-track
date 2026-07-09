@@ -1,6 +1,7 @@
-import { eq, and, gte, sql, desc, notInArray } from "drizzle-orm";
+import { eq, and, gte, sql, desc, isNull, notInArray } from "drizzle-orm";
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import UsageEvent from "../models/usage-event.model";
+import { NULL_FILTER } from "../constants";
 
 const dayMs = 86_400_000;
 
@@ -29,12 +30,18 @@ const buildWhere = (filters: BaseFilters) => {
   if (filters.provider) conditions.push(eq(UsageEvent.provider, filters.provider));
   if (filters.excludeProviders && filters.excludeProviders.length > 0)
     conditions.push(notInArray(UsageEvent.provider, filters.excludeProviders));
-  if (filters.model) conditions.push(eq(UsageEvent.model, filters.model));
-  if (filters.clerk_org_id)
+  if (filters.model === NULL_FILTER) conditions.push(isNull(UsageEvent.model));
+  else if (filters.model) conditions.push(eq(UsageEvent.model, filters.model));
+  if (filters.clerk_org_id === NULL_FILTER)
+    conditions.push(isNull(UsageEvent.clerk_org_id));
+  else if (filters.clerk_org_id)
     conditions.push(eq(UsageEvent.clerk_org_id, filters.clerk_org_id));
-  if (filters.clerk_user_id)
+  if (filters.clerk_user_id === NULL_FILTER)
+    conditions.push(isNull(UsageEvent.clerk_user_id));
+  else if (filters.clerk_user_id)
     conditions.push(eq(UsageEvent.clerk_user_id, filters.clerk_user_id));
-  if (filters.action) conditions.push(eq(UsageEvent.action, filters.action));
+  if (filters.action === NULL_FILTER) conditions.push(isNull(UsageEvent.action));
+  else if (filters.action) conditions.push(eq(UsageEvent.action, filters.action));
   if (filters.correlation_id)
     conditions.push(eq(UsageEvent.correlation_id, filters.correlation_id));
   return and(...conditions);
@@ -54,6 +61,21 @@ class UsageEventRepository {
     );
     await db.batch(stmts as any);
     return rows.length;
+  }
+
+  static async retagAction(
+    db: DrizzleD1Database,
+    tenant_id: string,
+    from: string,
+    into: string,
+  ): Promise<number> {
+    const result = await db
+      .update(UsageEvent)
+      .set({ action: into })
+      .where(
+        and(eq(UsageEvent.tenant_id, tenant_id), eq(UsageEvent.action, from)),
+      );
+    return (result as any)?.meta?.changes ?? 0;
   }
 
   static async findById(db: DrizzleD1Database, id: string) {
