@@ -15,10 +15,12 @@ import DateRangePicker from "./date-range-picker";
 import SpendAreaChart from "./spend-area-chart";
 import DimensionList from "./dimension-list";
 import ProviderTrackersTab from "~/components/tracker/ProviderTrackersTab";
+import ActionRowMenu from "~/components/action/ActionRowMenu";
 import { cn } from "~/lib/utils";
 import { formatMoney, formatNumber } from "~/utils/format";
 import {
   DIMENSIONS,
+  NULL_FILTER,
   isEntityId,
   type EntityConfig,
   type EntityId,
@@ -35,6 +37,8 @@ interface Props {
   initialRange: DateRange;
   initialPresetId: RangePresetId | null;
   onDrill?: (entityId: EntityId, group: UsageGroup) => void;
+  onRenameAction?: (group: UsageGroup) => void;
+  onMergeAction?: (group: UsageGroup) => void;
 }
 
 function HeadlineStat({
@@ -71,6 +75,8 @@ export default function EntityDetailSheet({
   initialRange,
   initialPresetId,
   onDrill,
+  onRenameAction,
+  onMergeAction,
 }: Props) {
   const { authFetch } = useAuthContext();
   const [range, setRange] = useState<DateRange>(initialRange);
@@ -89,12 +95,12 @@ export default function EntityDetailSheet({
   }, [open, entity?.key, config.id]);
 
   useEffect(() => {
-    if (!open || !entity?.key) return;
+    if (!open || !entity) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     UsageService.getOverview(authFetch, {
-      [config.filterKey]: entity.key,
+      [config.filterKey]: entity.key ?? NULL_FILTER,
       from: range.from,
       to: range.to,
       lifetime: isLifetimePreset(activePresetId),
@@ -130,6 +136,19 @@ export default function EntityDetailSheet({
   const title = entity ? config.label(entity) : "";
   const tabs = config.related.map((id) => DIMENSIONS[id]);
   const showTrackers = config.id === "provider" && Boolean(entity?.key);
+  const actionMenu =
+    config.id === "action" && entity?.key && onRenameAction && onMergeAction ? (
+      <ActionRowMenu
+        group={entity}
+        onRename={onRenameAction}
+        onMerge={onMergeAction}
+      />
+    ) : null;
+  const showSlug =
+    config.id === "action" &&
+    entity?.name &&
+    entity.key &&
+    entity.name !== entity.key;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -143,15 +162,23 @@ export default function EntityDetailSheet({
               <SheetTitle className="text-[24px] font-bold leading-tight tracking-tight">
                 {title}
               </SheetTitle>
+              {showSlug ? (
+                <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                  {entity?.key}
+                </p>
+              ) : null}
             </div>
-            <DateRangePicker
-              value={range}
-              activePresetId={activePresetId}
-              onChange={(next, presetId) => {
-                setRange(next);
-                setActivePresetId(presetId);
-              }}
-            />
+            <div className="flex items-center gap-1.5">
+              {actionMenu}
+              <DateRangePicker
+                value={range}
+                activePresetId={activePresetId}
+                onChange={(next, presetId) => {
+                  setRange(next);
+                  setActivePresetId(presetId);
+                }}
+              />
+            </div>
           </div>
 
           {loading ? (
@@ -226,6 +253,7 @@ export default function EntityDetailSheet({
                     variant={t.variant}
                     emptyLabel={t.emptyLabel}
                     fallbackLabel={t.fallbackLabel}
+                    nullable={t.nullable}
                     onSelect={
                       onDrill && isEntityId(t.id)
                         ? (group) => onDrill(t.id as EntityId, group)

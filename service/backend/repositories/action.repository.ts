@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, desc } from "drizzle-orm";
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import Action from "../models/action.model";
 
@@ -61,6 +61,34 @@ class ActionRepository {
   static async remove(db: DrizzleD1Database, id: string) {
     const [deleted] = await db.delete(Action).where(eq(Action.id, id)).returning();
     return deleted;
+  }
+
+  static async fetchMergedMap(db: DrizzleD1Database, tenant_id: string) {
+    const rows = await db
+      .select({ slug: Action.slug, merged_into: Action.merged_into })
+      .from(Action)
+      .where(
+        and(eq(Action.tenant_id, tenant_id), isNotNull(Action.merged_into)),
+      );
+    const map = new Map<string, string>();
+    for (const r of rows) {
+      if (r.merged_into) map.set(r.slug, r.merged_into);
+    }
+    return map;
+  }
+
+  static async repointMerged(
+    db: DrizzleD1Database,
+    tenant_id: string,
+    from: string,
+    into: string,
+  ) {
+    await db
+      .update(Action)
+      .set({ merged_into: into, updated_at: new Date().toISOString() })
+      .where(
+        and(eq(Action.tenant_id, tenant_id), eq(Action.merged_into, from)),
+      );
   }
 }
 

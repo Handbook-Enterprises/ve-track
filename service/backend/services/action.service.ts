@@ -1,10 +1,13 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { ActionRepository } from "../repositories/action.repository";
+import { UsageEventRepository } from "../repositories/usage-event.repository";
 import { ActionMessages } from "../messages/action.messages";
 import { CustomError, DuplicateError, slugify } from "../utils";
 import { HTTP_STATUS_CODES } from "../constants";
 import type {
   ActionCreateBody,
+  ActionMergeBody,
+  ActionRenameBody,
   ActionUpdateBody,
 } from "../interfaces/action.interface";
 
@@ -119,6 +122,82 @@ class ActionService {
       success: true,
       message: ActionMessages.UPDATE_SUCCESS,
       data: updated,
+    };
+  }
+
+  static async rename(
+    db: DrizzleD1Database,
+    tenantId: string,
+    body: ActionRenameBody,
+  ) {
+    const slug = (body.slug ?? "").trim();
+    const name = (body.name ?? "").trim();
+    if (!slug || !name) {
+      throw new CustomError(
+        ActionMessages.RENAME_VALIDATION_ERROR,
+        HTTP_STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const existing = await ActionRepository.fetchBySlug(db, tenantId, null, slug);
+    const data = existing
+      ? await ActionRepository.update(db, existing.id, { name })
+      : await ActionRepository.create(db, {
+          tenant_id: tenantId,
+          slug,
+          name,
+          app_slug: null,
+        });
+    return { success: true, message: ActionMessages.RENAME_SUCCESS, data };
+  }
+
+  static async merge(
+    db: DrizzleD1Database,
+    tenantId: string,
+    body: ActionMergeBody,
+  ) {
+    const from = (body.from ?? "").trim();
+    const into = (body.into ?? "").trim();
+    if (!from || !into || from === into) {
+      throw new CustomError(
+        ActionMessages.MERGE_VALIDATION_ERROR,
+        HTTP_STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const target = await ActionRepository.fetchBySlug(db, tenantId, null, into);
+    if (target?.merged_into) {
+      throw new CustomError(
+        ActionMessages.MERGE_TARGET_MERGED,
+        HTTP_STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const retagged = await UsageEventRepository.retagAction(
+      db,
+      tenantId,
+      from,
+      into,
+    );
+
+    const source = await ActionRepository.fetchBySlug(db, tenantId, null, from);
+    if (source) {
+      await ActionRepository.update(db, source.id, { merged_into: into });
+    } else {
+      await ActionRepository.create(db, {
+        tenant_id: tenantId,
+        slug: from,
+        name: from,
+        app_slug: null,
+        merged_into: into,
+      });
+    }
+    await ActionRepository.repointMerged(db, tenantId, from, into);
+
+    return {
+      success: true,
+      message: ActionMessages.MERGE_SUCCESS,
+      data: { from, into, retagged },
     };
   }
 

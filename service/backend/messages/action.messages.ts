@@ -7,4 +7,9 @@ export const ActionMessages = {
   NOT_FOUND: "Action not found",
   DUPLICATE: "An action with that slug already exists for this app",
   VALIDATION_ERROR: "Provide a name for the action",
+  RENAME_SUCCESS: "Action display name saved",
+  RENAME_VALIDATION_ERROR: "Provide the action slug and a display name",
+  MERGE_SUCCESS: "Actions merged successfully",
+  MERGE_VALIDATION_ERROR: "Provide two different action slugs to merge",
+  MERGE_TARGET_MERGED: "That target action was already merged into another action",
 };
