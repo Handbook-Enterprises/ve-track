@@ -244,6 +244,7 @@ class TrackerService {
     tenantId: string,
     window: UsageWindow,
     lifetime = false,
+    provider?: string,
   ): Promise<TrackerContribution> {
     const fromTs = window.fromTs;
     const toTs = window.toTs ?? Date.now();
@@ -252,6 +253,7 @@ class TrackerService {
     const trackers = await TrackerRepository.fetchByTenant(db, tenantId);
     const moneyTrackers = new Map<string, { provider: string }>();
     for (const t of trackers) {
+      if (provider && t.provider !== provider) continue;
       if (isMoneyKind(metricKind(t)))
         moneyTrackers.set(t.id, { provider: t.provider });
     }
