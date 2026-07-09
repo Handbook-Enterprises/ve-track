@@ -32,6 +32,10 @@ Run with `cd service && bun <script>.ts`. Pass `env` as `{}` — `resolveIdentit
 
 ## Gotchas
 
+- Local D1 uses WAL: `cp` of the `.sqlite` file misses recent writes (e.g. fresh migrations). Snapshot with `VACUUM INTO '<dest>'` from bun:sqlite instead.
+- For write path harnesses (ingest), bun-sqlite drizzle has no `db.batch`; shim it: `db.batch = async (stmts) => { const out = []; for (const s of stmts) out.push(await s); return out; }`. Update results also lack D1's `meta.changes` (counts read as 0 in the harness; fine on real D1).
+- `buildWhere` uses `timestamp < toTs`, so a test event stamped exactly `Date.now()` falls outside a window ending now.
+
 - The frontend "Lifetime" preset sends `from = now − 5y, to = now` AND `lifetime=1` (`app/utils/date-range.ts`). Passing only `lifetime: "1"` makes `resolveWindow` fall back to a 7-day window and silently return near-empty results.
 - To exercise filtered paths, insert temp rows with ids like `verify-test-%` via wrangler d1, then `DELETE FROM usage_events WHERE id LIKE 'verify-test-%'` after.
 - Before/after comparisons: `git stash` → run harness → `git stash pop` → run again.

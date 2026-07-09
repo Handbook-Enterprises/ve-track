@@ -1,6 +1,7 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { TenantRepository } from "../repositories/tenant.repository";
 import { ModelRepository } from "../repositories/model.repository";
+import { ActionRepository } from "../repositories/action.repository";
 import ApiKeyService from "./api-key.service";
 import UsageEventService, {
   computeMargin,
@@ -28,6 +29,19 @@ import type {
   UsageSeriesPoint,
 } from "../interfaces/usage-event.interface";
 import type { Env } from "../types";
+
+const actionNameMap = async (db: DrizzleD1Database, tenantId: string) => {
+  const actions = await ActionRepository.fetchByTenant(db, tenantId);
+  const map = new Map<
+    string,
+    { name: string; secondary: string | null; imageUrl: null }
+  >();
+  for (const a of actions) {
+    if (a.name && a.name !== a.slug)
+      map.set(a.slug, { name: a.name, secondary: a.slug, imageUrl: null });
+  }
+  return map;
+};
 
 const resolveTrackerContribution = async (
   db: DrizzleD1Database,
@@ -218,6 +232,10 @@ class DashboardService {
       byModelGroups = enrich(byModel.groups, modelMap);
     }
 
+    const actionMap = await actionNameMap(db, tenantId);
+    const byActionGroups =
+      actionMap.size > 0 ? enrich(byAction.groups, actionMap) : byAction.groups;
+
     const mergedCost = totals.totals.cost_usd + trackerContribution.totals.cost_usd;
     const eventPreviousCost = totals.totals.delta?.previousCost ?? 0;
     const trackerDominant =
@@ -282,7 +300,7 @@ class DashboardService {
         byUser: enrichedByUser,
         byProvider: mergedByProvider,
         byModel: byModelGroups,
-        byAction: byAction.groups,
+        byAction: byActionGroups,
         series: mergedSeries,
       },
     };
@@ -381,6 +399,10 @@ class DashboardService {
       byModelGroups = enrich(byModel.groups, modelMap);
     }
 
+    const actionMap = await actionNameMap(db, tenantId);
+    const byActionGroups =
+      actionMap.size > 0 ? enrich(byAction.groups, actionMap) : byAction.groups;
+
     const revenue = fullTotals.current.revenue_usd;
     const credits = fullTotals.current.credits_charged;
     const blendedCost =
@@ -454,7 +476,7 @@ class DashboardService {
       },
       series,
       byApp: byApp.groups,
-      byAction: byAction.groups,
+      byAction: byActionGroups,
       byUser: enrichedByUser,
       byOrg: enrichedByOrg,
       byProvider: byProvider.groups,

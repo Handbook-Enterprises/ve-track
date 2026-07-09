@@ -12,6 +12,7 @@ interface Props {
   rows: UsageGroup[];
   totalCost: number;
   onSelect?: (row: UsageGroup) => void;
+  rowActions?: (row: UsageGroup) => React.ReactNode;
 }
 
 export default function EntityTable({
@@ -19,6 +20,7 @@ export default function EntityTable({
   rows,
   totalCost,
   onSelect,
+  rowActions,
 }: Props) {
   const columns = useMemo<ColumnDef<UsageGroup>[]>(
     () => [
@@ -55,8 +57,17 @@ export default function EntityTable({
                   accent={isTop}
                 />
               ) : (
-                <span className="truncate text-[13.5px] font-semibold">
-                  {config.label(row.original)}
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[13.5px] font-semibold">
+                    {config.label(row.original)}
+                  </span>
+                  {row.original.name &&
+                  row.original.key &&
+                  row.original.name !== row.original.key ? (
+                    <span className="truncate font-mono text-[10.5px] text-muted-foreground">
+                      {row.original.key}
+                    </span>
+                  ) : null}
                 </span>
               )}
             </div>
@@ -152,8 +163,23 @@ export default function EntityTable({
           </span>
         ),
       },
+      ...(rowActions
+        ? [
+            {
+              id: "menu",
+              enableSorting: false,
+              header: () => null,
+              meta: { align: "right", headClassName: "w-10", cellClassName: "w-10" },
+              cell: ({ row }) => (
+                <span className="flex justify-end">
+                  {rowActions(row.original)}
+                </span>
+              ),
+            } satisfies ColumnDef<UsageGroup>,
+          ]
+        : []),
     ],
-    [config, totalCost],
+    [config, totalCost, rowActions],
   );
 
   return (
