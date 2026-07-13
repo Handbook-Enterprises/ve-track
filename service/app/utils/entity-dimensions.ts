@@ -33,6 +33,7 @@ export interface DimensionDef {
   label: (g: UsageGroup) => string;
   emptyLabel: string;
   fallbackLabel: string;
+  untrackedNoun: string;
   filterKey?: keyof UsageQueryFilters;
   nullable?: boolean;
 }
@@ -51,6 +52,7 @@ export interface EntityConfig extends DimensionDef {
 export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   provider: {
     id: "provider",
+    untrackedNoun: "provider",
     tabLabel: "Providers",
     pick: (o) => o.byProvider,
     variant: "plain",
@@ -61,6 +63,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   },
   model: {
     id: "model",
+    untrackedNoun: "model",
     tabLabel: "Models",
     pick: (o) => o.byModel,
     variant: "plain",
@@ -72,6 +75,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   },
   app: {
     id: "app",
+    untrackedNoun: "app",
     tabLabel: "Apps",
     pick: (o) => o.byApp,
     variant: "plain",
@@ -82,6 +86,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   },
   people: {
     id: "people",
+    untrackedNoun: "person",
     tabLabel: "People",
     pick: (o) => o.byUser,
     variant: "identity",
@@ -93,6 +98,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   },
   org: {
     id: "org",
+    untrackedNoun: "organization",
     tabLabel: "Organizations",
     pick: (o) => o.byOrg,
     variant: "identity",
@@ -104,6 +110,7 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
   },
   action: {
     id: "action",
+    untrackedNoun: "action",
     tabLabel: "Actions",
     pick: (o) => o.byAction,
     variant: "plain",

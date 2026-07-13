@@ -254,6 +254,10 @@ export default function EntityDetailSheet({
                     emptyLabel={t.emptyLabel}
                     fallbackLabel={t.fallbackLabel}
                     nullable={t.nullable}
+                    untrackedNotice={{
+                      title: `No ${t.untrackedNoun} data`,
+                      description: `${title} does not send ${t.untrackedNoun} data with its events, so there is nothing to break down here.`,
+                    }}
                     onSelect={
                       onDrill && isEntityId(t.id)
                         ? (group) => onDrill(t.id as EntityId, group)
