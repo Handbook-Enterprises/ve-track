@@ -11,6 +11,7 @@ interface Props {
   fallbackLabel?: string;
   limit?: number;
   nullable?: boolean;
+  untrackedNotice?: { title: string; description: string };
   onSelect?: (group: UsageGroup) => void;
 }
 
@@ -30,6 +31,7 @@ export default function DimensionList({
   fallbackLabel = "Unknown",
   limit = 12,
   nullable = false,
+  untrackedNotice,
   onSelect,
 }: Props) {
   const rows = groups
@@ -41,6 +43,19 @@ export default function DimensionList({
       <p className="px-1 py-8 text-center text-[12.5px] text-muted-foreground">
         No data in this period.
       </p>
+    );
+  }
+
+  if (untrackedNotice && rows.every((g) => g.key == null)) {
+    return (
+      <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          {untrackedNotice.title}
+        </p>
+        <p className="max-w-[34ch] text-[12.5px] leading-relaxed text-muted-foreground">
+          {untrackedNotice.description}
+        </p>
+      </div>
     );
   }
 
