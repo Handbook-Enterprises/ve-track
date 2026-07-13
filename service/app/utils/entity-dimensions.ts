@@ -47,6 +47,7 @@ export interface EntityConfig extends DimensionDef {
   icon: LucideIcon;
   filterKey: keyof UsageQueryFilters;
   related: DimensionId[];
+  nullSegment?: { title: string; description: string };
 }
 
 export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
@@ -67,9 +68,9 @@ export const DIMENSIONS: Record<DimensionId, DimensionDef> = {
     tabLabel: "Models",
     pick: (o) => o.byModel,
     variant: "plain",
-    label: (g) => g.name ?? g.key ?? "Unknown",
-    emptyLabel: "Unknown",
-    fallbackLabel: "Unknown",
+    label: (g) => g.name ?? g.key ?? "No model",
+    emptyLabel: "No model",
+    fallbackLabel: "No model",
     filterKey: "model",
     nullable: true,
   },
@@ -142,6 +143,11 @@ export const ENTITIES: Record<EntityId, EntityConfig> = {
     route: "/dashboard/models",
     icon: Cpu,
     related: ["provider", "action", "app", "people", "org"],
+    nullSegment: {
+      title: "Usage without a model",
+      description:
+        "Spend from events that carry no model, such as scraping or credit deductions.",
+    },
   },
   app: {
     ...(DIMENSIONS.app as DimensionDef & { filterKey: keyof UsageQueryFilters }),
