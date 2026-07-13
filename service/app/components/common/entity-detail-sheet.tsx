@@ -149,6 +149,7 @@ export default function EntityDetailSheet({
     entity?.name &&
     entity.key &&
     entity.name !== entity.key;
+  const isNullEntity = entity != null && entity.key == null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -165,6 +166,11 @@ export default function EntityDetailSheet({
               {showSlug ? (
                 <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
                   {entity?.key}
+                </p>
+              ) : null}
+              {isNullEntity && config.nullSegment ? (
+                <p className="mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
+                  {config.nullSegment.description}
                 </p>
               ) : null}
             </div>
@@ -256,7 +262,9 @@ export default function EntityDetailSheet({
                     nullable={t.nullable}
                     untrackedNotice={{
                       title: `No ${t.untrackedNoun} data`,
-                      description: `${title} does not send ${t.untrackedNoun} data with its events, so there is nothing to break down here.`,
+                      description: isNullEntity
+                        ? `These events do not include ${t.untrackedNoun} data, so there is nothing to break down here.`
+                        : `${title} does not send ${t.untrackedNoun} data with its events, so there is nothing to break down here.`,
                     }}
                     onSelect={
                       onDrill && isEntityId(t.id)

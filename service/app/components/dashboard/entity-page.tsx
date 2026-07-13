@@ -6,6 +6,7 @@ import { ButtonElement } from "~/components/elements";
 import DateRangePicker from "~/components/common/date-range-picker";
 import EntityTable from "~/components/common/entity-table";
 import EntityTableSkeleton from "~/components/common/entity-table-skeleton";
+import NullSegmentStrip from "~/components/common/null-segment-strip";
 import EntityDetailSheet from "~/components/common/entity-detail-sheet";
 import ActionRowMenu from "~/components/action/ActionRowMenu";
 import RenameActionDialog from "~/components/action/RenameActionDialog";
@@ -66,10 +67,17 @@ export default function EntityPage({ config }: Props) {
     setSheetOpen(true);
   };
 
-  const rows = useMemo(
-    () => config.pick(overview).filter((g) => g.key !== "canary"),
-    [config, overview],
-  );
+  const { rows, nullGroup } = useMemo(() => {
+    const groups = config.pick(overview).filter((g) => g.key !== "canary");
+    if (!config.nullSegment) return { rows: groups, nullGroup: null };
+    const nullRow = groups.find(
+      (g) => g.key == null && (g.cost_usd > 0 || g.requests > 0),
+    );
+    return {
+      rows: groups.filter((g) => g.key != null),
+      nullGroup: nullRow ?? null,
+    };
+  }, [config, overview]);
 
   const [renameTarget, setRenameTarget] = useState<UsageGroup | null>(null);
   const [mergeSource, setMergeSource] = useState<UsageGroup | null>(null);
@@ -176,6 +184,14 @@ export default function EntityPage({ config }: Props) {
           }
         />
       )}
+      {!loading && !error && nullGroup && config.nullSegment ? (
+        <NullSegmentStrip
+          title={config.nullSegment.title}
+          description={config.nullSegment.description}
+          group={nullGroup}
+          onSelect={(group) => openEntity(config.id, group)}
+        />
+      ) : null}
       {!loading && !error ? (
         <p className="text-[11px] text-muted-foreground">
           Click a {config.noun} to see its spend over time and how it relates to
