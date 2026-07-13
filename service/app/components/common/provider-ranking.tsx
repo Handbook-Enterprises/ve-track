@@ -1,5 +1,5 @@
 import { cn } from "~/lib/utils";
-import { formatMoney, formatNumber } from "~/utils/format";
+import { formatMoney } from "~/utils/format";
 import type { UsageGroup } from "~/types/usage.types";
 
 interface Props {
@@ -57,8 +57,7 @@ export default function ProviderRanking({ providers, totalCost }: Props) {
                     style={{ width: `${Math.max(share, 1.5)}%` }}
                   />
                 </div>
-                <span className="w-24 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-                  {formatNumber(provider.requests)} calls ·{" "}
+                <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
                   {share >= 1 ? `${Math.round(share)}%` : "<1%"}
                 </span>
               </div>
