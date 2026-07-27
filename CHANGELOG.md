@@ -4,6 +4,21 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.9.0 — 2026-07-27
+
+### Compiled package, lazy identity resolution, memory bounds
+
+The package now ships a compiled build. Previously every entry point pointed at raw TypeScript source, which pulled the SDK's files into each consumer's own `tsc` program — any internal type drift broke downstream CI, and `skipLibCheck` could not help because it only applies to `.d.ts` files. Consumers now get `dist/` JavaScript plus declarations, so the SDK typechecks once, here.
+
+- **`dist/` build** — `main`, `module`, `types`, and `exports` all point at compiled artifacts with declarations and source maps. `dist/` is committed so `github:` installs work without lifecycle scripts; CI fails any PR whose `dist/` is stale, and the SDK's own `tsc --noEmit` runs on every push and pull request.
+- **Three internal type errors fixed** — `buildScope` had drifted from `RequestScope` (missing `action` and `pending`), the scheduled handler still expected the pre-rename `ScheduledEvent` instead of `ScheduledController`, and `TrackedHandlerConfig.fetch` used a hand written signature narrower than `ExportedHandlerFetchHandler`. Handler types are now derived from `ExportedHandler<E>` itself, so future workers-types renames surface here, not in consumers.
+- **Identity resolution is now lazy** — `resolveUser` no longer runs on request entry. It runs memoized on the first tracked event: before the first matched provider fetch (so enhancement headers and attribution still work), or at flush time for requests that only call `trackUsage`/`trackCredits`. Requests that record nothing skip resolution entirely, removing the cold isolate JWKS round trip from untracked request paths.
+- **Clerk cookie sessions and networkless verification** — with `CLERK_PUBLISHABLE_KEY` set, the default resolver uses `authenticateRequest`, which attributes both bearer token and session cookie requests (SSR page loads were previously attributed to nobody). With `CLERK_JWT_KEY` set, verification is a local signature check with zero network I/O.
+- **`maxExtractBytes` config** — optionally skip usage extraction for responses whose `Content-Length` exceeds a byte threshold; the event still records latency and status. Bounds transient memory when large provider payloads run at high concurrency.
+- **Extraction memory hygiene** — provider extractors no longer re-clone the response they are handed (the double clone retained a third full copy of every payload), and unread clone bodies are cancelled so providers that early-return (Zyte header cost, BrightData) stop buffering the entire body.
+- **Fix: string `apiKey`** — passing `apiKey` as a plain string to `trackHandler` now reaches the fetch path; previously it was silently dropped and only the `env.VE_TRACK_KEY` fallback worked there.
+- **Migration**: none for the API surface — all signatures are unchanged. Re-pin consumers to this tag to unblock typechecking. If your app relied on the resolver running eagerly on every request (for example reading `getCurrentScope().userId` before any tracked event), pass your own `resolveUser` and call it yourself. package.json `version` now matches this changelog's numbering (it previously sat at 0.1.0).
+
 ## v0.8.0 — 2026-07-09
 
 ### Action management and unattributed drill downs

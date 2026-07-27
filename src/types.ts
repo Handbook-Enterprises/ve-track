@@ -44,6 +44,9 @@ export interface RequestScope {
   action: string | null;
   buffer: VeTrackEvent[];
   pending: Promise<unknown>[];
+  resolveIdentity?: () => Promise<VeTrackUser>;
+  unattributed?: VeTrackEvent[];
+  maxExtractBytes?: number;
 }
 
 export interface Provider {
@@ -64,18 +67,11 @@ export interface TrackedHandlerConfig<E> {
   baseUrl?: string;
   appUrl?: (env: E) => string | undefined;
   resolveUser?: UserResolver<E>;
-  fetch: (
-    req: Request,
-    env: E,
-    ctx: ExecutionContext,
-  ) => Response | Promise<Response>;
-  scheduled?: (
-    event: ScheduledEvent,
-    env: E,
-    ctx: ExecutionContext,
-  ) => void | Promise<void>;
-  queue?: (batch: MessageBatch<unknown>, env: E, ctx: ExecutionContext) => void | Promise<void>;
-  email?: (message: ForwardableEmailMessage, env: E, ctx: ExecutionContext) => void | Promise<void>;
-  tail?: (events: TraceItem[], env: E, ctx: ExecutionContext) => void | Promise<void>;
-  trace?: (traces: TraceItem[], env: E, ctx: ExecutionContext) => void | Promise<void>;
+  maxExtractBytes?: number;
+  fetch: NonNullable<ExportedHandler<E>["fetch"]>;
+  scheduled?: NonNullable<ExportedHandler<E>["scheduled"]>;
+  queue?: NonNullable<ExportedHandler<E>["queue"]>;
+  email?: NonNullable<ExportedHandler<E>["email"]>;
+  tail?: NonNullable<ExportedHandler<E>["tail"]>;
+  trace?: NonNullable<ExportedHandler<E>["trace"]>;
 }

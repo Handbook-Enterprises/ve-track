@@ -1,9 +1,44 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { PROVIDERS } from "./providers";
 import { captureOriginalFetch, flushEvents } from "./ingest";
-import type { RequestScope, VeTrackEvent, VeTrackUser } from "./types";
+import type {
+  Provider,
+  RequestScope,
+  VeTrackEvent,
+  VeTrackUsage,
+  VeTrackUser,
+} from "./types";
 
 const requestContext = new AsyncLocalStorage<RequestScope>();
+
+const runExtract = async (
+  provider: Provider,
+  response: Response,
+): Promise<VeTrackUsage | null> => {
+  const clone = response.clone();
+  try {
+    return await provider.extract(clone);
+  } catch {
+    return null;
+  } finally {
+    if (!clone.bodyUsed) {
+      await clone.body?.cancel().catch(() => {});
+    }
+  }
+};
+
+const backfillIdentity = async (scope: RequestScope): Promise<void> => {
+  const events = scope.unattributed;
+  if (!scope.resolveIdentity || !events || events.length === 0) return;
+  const user = await scope.resolveIdentity().catch(() => null);
+  scope.resolveIdentity = undefined;
+  if (!user) return;
+  for (const event of events) {
+    if (event.clerk_user_id === null) event.clerk_user_id = user.userId;
+    if (event.clerk_org_id === null) event.clerk_org_id = user.orgId;
+  }
+  events.length = 0;
+};
 
 let installed = false;
 
@@ -30,6 +65,13 @@ export function installFetchHook(): void {
       return originalFetch(input, init);
     }
 
+    if (scope.resolveIdentity) {
+      const user = await scope.resolveIdentity();
+      scope.userId = user.userId;
+      scope.orgId = user.orgId;
+      scope.resolveIdentity = undefined;
+    }
+
     const mutableInit: RequestInit = init ?? {};
     provider.enhance?.(mutableInit, scope.app, {
       userId: scope.userId,
@@ -40,10 +82,14 @@ export function installFetchHook(): void {
     const response = await originalFetch(input, mutableInit);
     const latencyMs = Date.now() - start;
 
+    const contentLength = Number(response.headers.get("content-length"));
+    const skipExtract =
+      typeof scope.maxExtractBytes === "number" &&
+      Number.isFinite(contentLength) &&
+      contentLength > scope.maxExtractBytes;
+
     const extractTask = (async () => {
-      const usage = await provider
-        .extract(response.clone())
-        .catch(() => null);
+      const usage = skipExtract ? null : await runExtract(provider, response);
 
       const event: VeTrackEvent = {
         id: crypto.randomUUID(),
@@ -79,6 +125,7 @@ export function runScope<T>(
   handler: () => Promise<T> | T,
 ): Promise<T> {
   if (!scope.pending) scope.pending = [];
+  if (!scope.unattributed) scope.unattributed = [];
   if (scope.action === undefined) scope.action = null;
   return requestContext.run(scope, async () => {
     try {
@@ -87,6 +134,7 @@ export function runScope<T>(
       scope.ctx.waitUntil(
         (async () => {
           await Promise.allSettled(scope.pending);
+          await backfillIdentity(scope);
           await flushEvents(scope);
         })(),
       );
@@ -104,6 +152,7 @@ export function withUser<T>(
     ...scope,
     userId: user.userId,
     orgId: user.orgId,
+    resolveIdentity: undefined,
   };
   return Promise.resolve(requestContext.run(childScope, handler));
 }
@@ -160,6 +209,9 @@ export function trackUsage(usage: TrackUsageInput): void {
     credit_price_usd_at_event: usage.creditPriceUsd ?? null,
   };
   scope.buffer.push(event);
+  if (scope.resolveIdentity && usage.userId === undefined && usage.orgId === undefined) {
+    scope.unattributed?.push(event);
+  }
 }
 
 export interface TrackCreditsInput {
@@ -197,6 +249,9 @@ export function trackCredits(input: TrackCreditsInput): void {
     credit_price_usd_at_event: input.creditPriceUsd ?? null,
   };
   scope.buffer.push(event);
+  if (scope.resolveIdentity && input.userId === undefined && input.orgId === undefined) {
+    scope.unattributed?.push(event);
+  }
 }
 
 export function getCurrentScope(): RequestScope | undefined {

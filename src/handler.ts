@@ -17,24 +17,25 @@ const resolveString = <E>(
 const buildScope = <E>(
   env: E,
   ctx: ExecutionContext,
-  app: string,
-  apiKeySource: ((env: E) => string | undefined) | undefined,
-  baseUrlOverride: string | undefined,
-  user: VeTrackUser,
+  config: TrackedHandlerConfig<E>,
 ): RequestScope => {
-  const apiKey = resolveString(apiKeySource, env, "VE_TRACK_KEY");
+  const apiKey = resolveString(config.apiKey, env, "VE_TRACK_KEY");
   const baseUrl =
-    baseUrlOverride ??
+    config.baseUrl ??
     resolveString(undefined, env, "VE_TRACK_BASE_URL") ??
     DEFAULT_BASE_URL;
   return {
     ctx,
-    app,
+    app: config.app,
     apiKey,
     baseUrl,
-    userId: user.userId,
-    orgId: user.orgId,
+    userId: null,
+    orgId: null,
+    action: null,
     buffer: [],
+    pending: [],
+    unattributed: [],
+    maxExtractBytes: config.maxExtractBytes,
   };
 };
 
@@ -45,57 +46,36 @@ export function trackedHandler<E>(
 
   return {
     async fetch(req, env, ctx) {
-      const user = config.resolveUser
-        ? await config.resolveUser(req, env)
-        : EMPTY_USER;
-      return runScope(
-        buildScope(env, ctx, config.app, config.apiKey, config.baseUrl, user),
-        () => config.fetch(req, env, ctx),
-      );
+      const scope = buildScope(env, ctx, config);
+      const resolveUser = config.resolveUser;
+      if (resolveUser) {
+        let memo: Promise<VeTrackUser> | undefined;
+        scope.resolveIdentity = () =>
+          (memo ??= Promise.resolve(resolveUser(req, env)).catch(
+            () => EMPTY_USER,
+          ));
+      }
+      return runScope(scope, () => config.fetch(req, env, ctx));
     },
 
     scheduled: config.scheduled
       ? (event, env, ctx) =>
-          runScope(
-            buildScope(
-              env,
-              ctx,
-              config.app,
-              config.apiKey,
-              config.baseUrl,
-              EMPTY_USER,
-            ),
-            () => config.scheduled!(event, env, ctx),
+          runScope(buildScope(env, ctx, config), () =>
+            config.scheduled!(event, env, ctx),
           )
       : undefined,
 
     queue: config.queue
       ? (batch, env, ctx) =>
-          runScope(
-            buildScope(
-              env,
-              ctx,
-              config.app,
-              config.apiKey,
-              config.baseUrl,
-              EMPTY_USER,
-            ),
-            () => config.queue!(batch, env, ctx),
+          runScope(buildScope(env, ctx, config), () =>
+            config.queue!(batch, env, ctx),
           )
       : undefined,
 
     email: config.email
       ? (message, env, ctx) =>
-          runScope(
-            buildScope(
-              env,
-              ctx,
-              config.app,
-              config.apiKey,
-              config.baseUrl,
-              EMPTY_USER,
-            ),
-            () => config.email!(message, env, ctx),
+          runScope(buildScope(env, ctx, config), () =>
+            config.email!(message, env, ctx),
           )
       : undefined,
 
