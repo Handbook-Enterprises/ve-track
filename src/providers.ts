@@ -1,5 +1,5 @@
-import type { Provider } from "./types";
-import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse";
+import type { Provider } from "./types.js";
+import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse.js";
 
 interface ModelPrice {
   inputPerM: number;
@@ -102,7 +102,7 @@ const readOpenAiUsage = async (
     if (!hit) return null;
     return { usage: hit.usage, model: hit.model ?? chunks[0]?.model ?? null };
   }
-  const j: any = await resp.clone().json().catch(() => null);
+  const j: any = await resp.json().catch(() => null);
   if (!j?.usage) return null;
   return { usage: j.usage, model: j.model ?? null };
 };
@@ -122,7 +122,7 @@ const readGeminiUsage = async (resp: Response): Promise<any | null> => {
     }
     return null;
   }
-  const j: any = await resp.clone().json().catch(() => null);
+  const j: any = await resp.json().catch(() => null);
   if (!j) return null;
   const usage = j.usageMetadata ?? j.usage_metadata ?? j.usage;
   if (!usage) return null;
@@ -162,7 +162,7 @@ const readAnthropicUsage = async (
       },
     };
   }
-  const j: any = await resp.clone().json().catch(() => null);
+  const j: any = await resp.json().catch(() => null);
   if (!j?.usage) return null;
   return { usage: j.usage, model: j.model ?? null };
 };
@@ -343,7 +343,7 @@ export const PROVIDERS: Provider[] = [
       } catch {
         /* */
       }
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const credits = j?.credits?.creditsCharged ?? j?.credits?.creditsToCharge;
       const taskType = j?.task?.taskType ?? j?.result?.taskType;
       const sync = CLORO_SYNC_ENDPOINTS.find((s) => s.match.test(resp.url));
@@ -361,7 +361,7 @@ export const PROVIDERS: Provider[] = [
     match: (u) => u.includes("fal.run"),
     extract: async (resp) => {
       if (!resp.ok) return null;
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const images = Array.isArray(j?.images) && j.images.length > 0 ? j.images.length : 1;
       let model: string | null = null;
       try {
@@ -381,7 +381,7 @@ export const PROVIDERS: Provider[] = [
     extract: async (resp) => {
       const headerCost = parseFloat(resp.headers.get("Zyte-Request-Cost") ?? "0");
       if (headerCost > 0) return { costUsd: headerCost };
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const bodyCost = j?.requestCost ?? j?.cost ?? 0;
       return bodyCost > 0 ? { costUsd: bodyCost } : { costUsd: 0.001 };
     },
@@ -390,7 +390,7 @@ export const PROVIDERS: Provider[] = [
     name: "dataforseo",
     match: (u) => u.includes("api.dataforseo.com"),
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const cost = j?.cost ?? j?.tasks?.[0]?.cost ?? 0;
       return { costUsd: cost };
     },
@@ -399,7 +399,7 @@ export const PROVIDERS: Provider[] = [
     name: "apify",
     match: (u) => u.includes("api.apify.com"),
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const data = j?.data ?? j;
       const cost = data?.usageTotalUsd ?? data?.stats?.computeUnits ?? 0;
       return { costUsd: typeof cost === "number" ? cost : 0 };
@@ -409,7 +409,7 @@ export const PROVIDERS: Provider[] = [
     name: "firecrawl",
     match: (u) => u.includes("api.firecrawl.dev"),
     extract: async (resp) => {
-      const j: any = await resp.clone().json().catch(() => null);
+      const j: any = await resp.json().catch(() => null);
       const credits = j?.creditsUsed ?? j?.data?.creditsUsed ?? 0;
       return { costUsd: 0, promptTokens: credits };
     },
