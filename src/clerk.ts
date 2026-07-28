@@ -1,4 +1,4 @@
-import type { UserResolver, VeTrackUser } from "./types";
+import type { UserResolver, VeTrackUser } from "./types.js";
 
 interface ClerkEnv {
   CLERK_SECRET_KEY?: string;

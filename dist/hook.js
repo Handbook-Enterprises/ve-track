@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { PROVIDERS } from "./providers";
-import { captureOriginalFetch, flushEvents } from "./ingest";
+import { PROVIDERS } from "./providers.js";
+import { captureOriginalFetch, flushEvents } from "./ingest.js";
 const requestContext = new AsyncLocalStorage();
 const runExtract = async (provider, response) => {
     const clone = response.clone();

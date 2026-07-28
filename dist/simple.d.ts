@@ -1,4 +1,4 @@
-import type { UserResolver } from "./types";
+import type { UserResolver } from "./types.js";
 export interface TrackConfig<E> {
     app: string;
     apiKey?: string | ((env: E) => string | undefined);
@@ -10,5 +10,5 @@ export declare function trackHandler<E>(config: TrackConfig<E>, handler: Exporte
 export declare function trackMessage<T>(message: {
     body?: unknown;
 }, fn: () => Promise<T> | T): Promise<T>;
-export { withAction as trackAction } from "./hook";
+export { withAction as trackAction } from "./hook.js";
 //# sourceMappingURL=simple.d.ts.map

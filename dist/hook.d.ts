@@ -1,4 +1,4 @@
-import type { RequestScope, VeTrackUser } from "./types";
+import type { RequestScope, VeTrackUser } from "./types.js";
 export declare function installFetchHook(): void;
 export declare function runScope<T>(scope: RequestScope, handler: () => Promise<T> | T): Promise<T>;
 export declare function withUser<T>(user: VeTrackUser, handler: () => Promise<T> | T): Promise<T>;

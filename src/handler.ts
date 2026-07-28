@@ -1,5 +1,5 @@
-import { installFetchHook, runScope } from "./hook";
-import type { RequestScope, TrackedHandlerConfig, VeTrackUser } from "./types";
+import { installFetchHook, runScope } from "./hook.js";
+import type { RequestScope, TrackedHandlerConfig, VeTrackUser } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://track.viewengine.ai";
 const EMPTY_USER: VeTrackUser = { userId: null, orgId: null };

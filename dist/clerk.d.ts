@@ -1,4 +1,4 @@
-import type { UserResolver } from "./types";
+import type { UserResolver } from "./types.js";
 interface ClerkEnv {
     CLERK_SECRET_KEY?: string;
     CLERK_PUBLISHABLE_KEY?: string;

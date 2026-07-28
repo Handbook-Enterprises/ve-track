@@ -1,8 +1,8 @@
-export { trackHandler, trackMessage, trackAction } from "./simple";
-export type { TrackConfig } from "./simple";
+export { trackHandler, trackMessage, trackAction } from "./simple.js";
+export type { TrackConfig } from "./simple.js";
 
-export { trackedHandler } from "./handler";
-export { clerkUserResolver } from "./clerk";
+export { trackedHandler } from "./handler.js";
+export { clerkUserResolver } from "./clerk.js";
 export {
   installFetchHook,
   runScope,
@@ -11,9 +11,9 @@ export {
   getCurrentScope,
   trackUsage,
   trackCredits,
-} from "./hook";
-export type { TrackUsageInput, TrackCreditsInput } from "./hook";
-export { PROVIDERS, cloroCreditsToUsd } from "./providers";
+} from "./hook.js";
+export type { TrackUsageInput, TrackCreditsInput } from "./hook.js";
+export { PROVIDERS, cloroCreditsToUsd } from "./providers.js";
 export type {
   TrackedHandlerConfig,
   UserResolver,
@@ -22,4 +22,4 @@ export type {
   VeTrackEvent,
   Provider,
   RequestScope,
-} from "./types";
+} from "./types.js";

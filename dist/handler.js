@@ -1,4 +1,4 @@
-import { installFetchHook, runScope } from "./hook";
+import { installFetchHook, runScope } from "./hook.js";
 const DEFAULT_BASE_URL = "https://track.viewengine.ai";
 const EMPTY_USER = { userId: null, orgId: null };
 const resolveString = (source, env, fallbackKey) => {

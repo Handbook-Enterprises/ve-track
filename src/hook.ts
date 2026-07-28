@@ -1,13 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { PROVIDERS } from "./providers";
-import { captureOriginalFetch, flushEvents } from "./ingest";
+import { PROVIDERS } from "./providers.js";
+import { captureOriginalFetch, flushEvents } from "./ingest.js";
 import type {
   Provider,
   RequestScope,
   VeTrackEvent,
   VeTrackUsage,
   VeTrackUser,
-} from "./types";
+} from "./types.js";
 
 const requestContext = new AsyncLocalStorage<RequestScope>();
 

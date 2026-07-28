@@ -1,5 +1,5 @@
-import type { Provider } from "./types";
-import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse";
+import type { Provider } from "./types.js";
+import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse.js";
 
 interface ModelPrice {
   inputPerM: number;

@@ -1,4 +1,4 @@
-import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse";
+import { isEventStream, parseSseData, readStreamUsageChunk } from "./sse.js";
 const MODEL_PRICING = [
     { match: /^gpt-5\b(?!-mini|-nano)/i, price: { inputPerM: 1.25, outputPerM: 10 } },
     { match: /^gpt-5-mini/i, price: { inputPerM: 0.25, outputPerM: 2 } },

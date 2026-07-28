@@ -1,7 +1,7 @@
-import { trackedHandler } from "./handler";
-import { runScope, withAction, withUser } from "./hook";
-import { clerkUserResolver } from "./clerk";
-import type { RequestScope, UserResolver } from "./types";
+import { trackedHandler } from "./handler.js";
+import { runScope, withAction, withUser } from "./hook.js";
+import { clerkUserResolver } from "./clerk.js";
+import type { RequestScope, UserResolver } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://track.viewengine.ai";
 
@@ -130,4 +130,4 @@ export function trackMessage<T>(
   return withUser({ userId, orgId }, wrapped);
 }
 
-export { withAction as trackAction } from "./hook";
+export { withAction as trackAction } from "./hook.js";
