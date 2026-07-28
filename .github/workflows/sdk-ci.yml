@@ -1,0 +1,19 @@
+name: SDK CI
+
+on:
+  push:
+    branches: [production, staging]
+  pull_request:
+
+jobs:
+  check:
+    name: Typecheck, build, dist freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run typecheck
+      - run: bun run build
+      - name: Fail if dist is stale
+        run: git diff --exit-code -- dist

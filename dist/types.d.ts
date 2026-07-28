@@ -1,0 +1,69 @@
+export interface VeTrackUser {
+    userId: string | null;
+    orgId: string | null;
+}
+export interface VeTrackUsage {
+    costUsd: number;
+    model?: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    cachedInputTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+}
+export interface VeTrackEvent {
+    id: string;
+    timestamp: number;
+    app: string;
+    clerk_user_id: string | null;
+    clerk_org_id: string | null;
+    action: string | null;
+    provider: string;
+    model: string | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    cached_input_tokens: number | null;
+    cache_write_tokens: number | null;
+    reasoning_tokens: number | null;
+    latency_ms: number | null;
+    cost_usd: number | null;
+    status_code: number | null;
+    credits_charged?: number | null;
+    credit_price_usd_at_event?: number | null;
+}
+export interface RequestScope {
+    ctx: ExecutionContext;
+    app: string;
+    apiKey: string | undefined;
+    baseUrl: string;
+    userId: string | null;
+    orgId: string | null;
+    action: string | null;
+    buffer: VeTrackEvent[];
+    pending: Promise<unknown>[];
+    resolveIdentity?: () => Promise<VeTrackUser>;
+    unattributed?: VeTrackEvent[];
+    maxExtractBytes?: number;
+}
+export interface Provider {
+    name: string;
+    match: (url: string) => boolean;
+    enhance?: (init: RequestInit, app: string, user: VeTrackUser) => void;
+    extract: (response: Response) => Promise<VeTrackUsage | null>;
+}
+export type UserResolver<E = unknown> = (req: Request, env: E) => Promise<VeTrackUser> | VeTrackUser;
+export interface TrackedHandlerConfig<E> {
+    app: string;
+    apiKey?: (env: E) => string | undefined;
+    baseUrl?: string;
+    appUrl?: (env: E) => string | undefined;
+    resolveUser?: UserResolver<E>;
+    maxExtractBytes?: number;
+    fetch: NonNullable<ExportedHandler<E>["fetch"]>;
+    scheduled?: NonNullable<ExportedHandler<E>["scheduled"]>;
+    queue?: NonNullable<ExportedHandler<E>["queue"]>;
+    email?: NonNullable<ExportedHandler<E>["email"]>;
+    tail?: NonNullable<ExportedHandler<E>["tail"]>;
+    trace?: NonNullable<ExportedHandler<E>["trace"]>;
+}
+//# sourceMappingURL=types.d.ts.map
