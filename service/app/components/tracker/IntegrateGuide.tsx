@@ -5,15 +5,15 @@ import { ButtonElement } from "~/components/elements";
 
 const INSTALL = "bun add github:Handbook-Enterprises/ve-track";
 
-const SNIPPET = `import { trackedHandler } from "@viewengine/track";
-import handler from "./app";
+const SNIPPET = `import { trackHandler } from "@viewengine/track";
+import app from "./api";
 
-export default trackedHandler({
-  app: "my-app",
-  apiKey: env.VE_TRACK_KEY,
-  resolveUser: (req) => req.headers.get("x-user-id"),
-  fetch: handler.fetch,
-});`;
+export default trackHandler<Env>(
+  { app: "my-app" },
+  {
+    fetch: (req, env, ctx) => app.fetch(req, env, ctx),
+  },
+);`;
 
 export default function IntegrateGuide() {
   return (

@@ -305,6 +305,7 @@ export default function Docs(_props: Route.ComponentProps) {
                       ["apiKey", "env.VE_TRACK_KEY", "Override if your secret is named differently."],
                       ["baseUrl", "track.viewengine.ai", "Point at staging or a self hosted instance."],
                       ["resolveUser", '"clerk"', 'Reads the Clerk session. Pass a custom resolver, or "none" to disable.'],
+                      ["maxExtractBytes", "unlimited", "Skip usage extraction for responses whose Content Length exceeds this many bytes. The event still records latency and status."],
                     ].map(([f, d, n]) => (
                       <tr key={f} className="border-b border-white/5 last:border-b-0">
                         <td className="px-4 py-3 align-top"><C>{f}</C></td>
@@ -315,6 +316,14 @@ export default function Docs(_props: Route.ComponentProps) {
                   </tbody>
                 </table>
               </div>
+              <P>
+                Resolution is lazy. The resolver runs at most once per request, and only
+                when the request actually records a tracked event: a matched provider
+                fetch, <C>trackUsage</C>, or <C>trackCredits</C>. Requests that never
+                touch a provider pay zero resolution cost. If your app already verifies
+                auth in middleware, pass a custom <C>resolveUser</C> that reads your
+                existing auth context instead of verifying the token a second time.
+              </P>
               <P>Custom resolver for non Clerk auth:</P>
               <CodeBlock
                 language="ts"
@@ -358,11 +367,33 @@ export default function Docs(_props: Route.ComponentProps) {
 
             <Section id="identity" index={7} title="Users and orgs">
               <P>
-                With the default <C>resolveUser: "clerk"</C>, ve-track reads the{" "}
-                <C>Authorization: Bearer</C> header, verifies it with your{" "}
-                <C>CLERK_SECRET_KEY</C>, and attributes the event to that user and org. If
-                any step fails the request still runs, the event just is not user attributed.
+                With the default <C>resolveUser: "clerk"</C>, ve-track attributes each
+                event to the signed in Clerk user and org. If any step fails the request
+                still runs, the event just is not user attributed. Which credentials it
+                reads depends on the env vars you expose.
               </P>
+              <div className="mt-5 overflow-x-auto border border-white/10">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left text-[10.5px] uppercase tracking-[0.14em] text-white/45">
+                      <th className="px-4 py-2.5 font-medium">Env vars present</th>
+                      <th className="px-4 py-2.5 font-medium">Behavior</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-white/70">
+                    {[
+                      ["CLERK_SECRET_KEY only", "Verifies the Authorization: Bearer header. Cookie authenticated page requests are not attributed."],
+                      ["+ CLERK_PUBLISHABLE_KEY", "Full session resolution via Clerk's authenticateRequest, covering both bearer tokens and session cookies. Use this for SSR apps where page loads authenticate via cookies."],
+                      ["+ CLERK_JWT_KEY", "Verification becomes a local signature check against the PEM public key, no network round trip to Clerk even on cold isolates. Recommended for latency sensitive Workers."],
+                    ].map(([vars, behavior]) => (
+                      <tr key={vars} className="border-b border-white/5 last:border-b-0">
+                        <td className="whitespace-nowrap px-4 py-3 align-top"><C>{vars}</C></td>
+                        <td className="px-4 py-3 align-top">{behavior}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <P>
                 For queue messages, the producer stamps{" "}
                 <C>{`body.auth = { userId, orgId }`}</C> on the message and{" "}
