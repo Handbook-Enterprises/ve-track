@@ -1,7 +1,7 @@
-import { trackedHandler } from "./handler";
-import { runScope, withAction, withUser } from "./hook";
-import { clerkUserResolver } from "./clerk";
-import type { RequestScope, UserResolver } from "./types";
+import { trackedHandler } from "./handler.js";
+import { runScope, withAction, withUser } from "./hook.js";
+import { clerkUserResolver } from "./clerk.js";
+import type { RequestScope, UserResolver } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://track.viewengine.ai";
 
@@ -15,6 +15,7 @@ export interface TrackConfig<E> {
   apiKey?: string | ((env: E) => string | undefined);
   baseUrl?: string;
   resolveUser?: "clerk" | "none" | UserResolver<E>;
+  maxExtractBytes?: number;
 }
 
 const resolveApiKey = <E>(
@@ -46,14 +47,14 @@ export function trackHandler<E>(
   handler: ExportedHandler<E>,
 ): ExportedHandler<E> {
   const resolver = pickResolver(config);
-  const apiKeyFn = typeof config.apiKey === "function" ? config.apiKey : undefined;
 
   const tracked = trackedHandler<E>({
     app: config.app,
-    apiKey: apiKeyFn,
+    apiKey: (env) => resolveApiKey(config, env),
     baseUrl:
       typeof config.baseUrl === "string" ? config.baseUrl : undefined,
     resolveUser: resolver,
+    maxExtractBytes: config.maxExtractBytes,
     fetch: handler.fetch
       ? handler.fetch.bind(handler)
       : () => new Response("Not Implemented", { status: 501 }),
@@ -63,18 +64,19 @@ export function trackHandler<E>(
     env: E,
     ctx: ExecutionContext,
     action: string,
-  ): RequestScope =>
-    ({
-      ctx,
-      app: config.app,
-      apiKey: resolveApiKey(config, env),
-      baseUrl: resolveBaseUrl(config, env),
-      userId: null,
-      orgId: null,
-      action,
-      buffer: [],
-      pending: [] as Promise<unknown>[],
-    }) as unknown as RequestScope;
+  ): RequestScope => ({
+    ctx,
+    app: config.app,
+    apiKey: resolveApiKey(config, env),
+    baseUrl: resolveBaseUrl(config, env),
+    userId: null,
+    orgId: null,
+    action,
+    buffer: [],
+    pending: [],
+    unattributed: [],
+    maxExtractBytes: config.maxExtractBytes,
+  });
 
   return {
     fetch: handler.fetch ? tracked.fetch : undefined,
@@ -128,4 +130,4 @@ export function trackMessage<T>(
   return withUser({ userId, orgId }, wrapped);
 }
 
-export { withAction as trackAction } from "./hook";
+export { withAction as trackAction } from "./hook.js";

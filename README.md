@@ -227,7 +227,10 @@ Standalone credit events are recorded under provider `"autumn"` (override with `
 | `app` | `string` | required | Identifier shown on the dashboard. Pick a stable slug like `ve-fanout`, `ve-rank`. |
 | `apiKey` | `string \| (env) => string \| undefined` | `env.VE_TRACK_KEY` | Override if your secret is named something else. |
 | `baseUrl` | `string` | `env.VE_TRACK_BASE_URL` or `https://track.viewengine.ai` | Point at staging or a self-hosted instance. |
-| `resolveUser` | `"clerk"` \| `"none"` \| custom function | `"clerk"` | Default reads the Clerk session bearer token. Pass a custom resolver for other auth, or `"none"` to disable user attribution. |
+| `resolveUser` | `"clerk"` \| `"none"` \| custom function | `"clerk"` | Default resolves the Clerk session (bearer token, or session cookie when `CLERK_PUBLISHABLE_KEY` is set). Pass a custom resolver for other auth, or `"none"` to disable user attribution. |
+| `maxExtractBytes` | `number` | unlimited | Skip usage extraction for provider responses whose `Content-Length` exceeds this many bytes. The event is still recorded with latency and status, just without token/cost detail. Bounds transient memory when very large provider payloads run at high concurrency. |
+
+**Resolution is lazy.** The resolver runs at most once per request, and only when the request actually records a tracked event (a matched provider fetch, `trackUsage`, or `trackCredits`). Requests that never touch a provider pay zero resolution cost. If your app already verifies auth in middleware, pass a custom `resolveUser` that reads your existing auth context instead of verifying the token a second time.
 
 **Custom resolver shape:**
 
@@ -273,6 +276,12 @@ Token-based LLMs are priced server-side from a live catalog; the rest use the co
 
 ## Identifying users + orgs
 
-With the default `resolveUser: "clerk"`, the SDK reads the `Authorization: Bearer <token>` header, verifies it with `env.CLERK_SECRET_KEY`, and attributes the event to that user and org (`org_id` claim, or the `X-Organization-Id` header as fallback). If any step fails the request still runs — the event just isn't user-attributed.
+With the default `resolveUser: "clerk"`, the SDK attributes events to the signed in Clerk user and org (`org_id` claim, or the `X-Organization-Id` header as fallback). If any step fails the request still runs — the event just isn't user-attributed. Which credentials it reads depends on the env vars you expose:
+
+| Env vars present | Behavior |
+|---|---|
+| `CLERK_SECRET_KEY` only | Verifies the `Authorization: Bearer <token>` header. Cookie-authenticated page requests are **not** attributed. |
+| `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` | Full session resolution via Clerk's `authenticateRequest` — handles both bearer tokens and session cookies. Use this for SSR apps where page loads authenticate via cookies. |
+| `CLERK_JWT_KEY` (with either of the above) | Verification becomes a local signature check against the PEM public key — no network round trip to Clerk's JWKS endpoint, even on cold isolates. Recommended for latency-sensitive Workers. |
 
 For **queue messages**, the producer stamps `body.auth = { userId, orgId }` on the message and `trackMessage` picks it up.

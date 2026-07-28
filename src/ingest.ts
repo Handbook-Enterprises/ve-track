@@ -1,4 +1,4 @@
-import type { RequestScope, VeTrackEvent } from "./types";
+import type { RequestScope, VeTrackEvent } from "./types.js";
 
 let originalFetch: typeof fetch | null = null;
 
