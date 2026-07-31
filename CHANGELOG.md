@@ -4,6 +4,18 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.10.0 — 2026-07-30
+
+### App Keys: name resolution across multiple Clerk instances
+
+The dashboard resolved user and organization names with a single Clerk secret key, so any tracked app running its own Clerk instance (VE Radar was the first) rendered raw `org_…` / `user_…` ids in every table. The dashboard can now hold one identity key per app.
+
+- **App Keys tab** — the Keys page is now two tabs: API Keys (unchanged) and App Keys. Paste the Clerk secret key of any app you track; it is validated live against Clerk, encrypted with the same AES-GCM envelope the cost trackers use (`CONNECTOR_ENC_KEY`, tenant id as AAD), and never displayed again. Rotate and remove supported. No new worker secrets or deploy steps are needed to add an app.
+- **Resolver key chain** — `resolveIdentities` now tries the central `CLERK_SECRET_KEY`, then the optional `CLERK_SECRET_KEYS` worker var (comma separated fallback list, an ops escape hatch), then the tenant's decrypted App Keys, in order, for whatever ids remain unresolved. Clerk ids are globally unique so ordering is safe.
+- **Caching** — identity caches are now namespaced per tenant (they were previously shared across tenants in the same isolate), unresolvable ids are negative cached for 10 minutes so dead ids stop hammering Clerk on every dashboard load, and decrypted tenant key lists are held in memory for 60 seconds. Adding or rotating an App Key clears the tenant's negative cache so names appear on the next load.
+- **New endpoints** `GET/POST /api/dashboard/identity-keys`, `PATCH/DELETE /api/dashboard/identity-keys/:id`. Public payloads never include ciphertext columns.
+- **Migration**: adds the `identity_keys` table (`0029_identity_keys.sql`), applied automatically by the deploy scripts. No SDK changes.
+
 ## v0.9.0 — 2026-07-27
 
 ### Compiled package, lazy identity resolution, memory bounds

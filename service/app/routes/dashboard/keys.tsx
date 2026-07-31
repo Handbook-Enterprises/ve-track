@@ -14,9 +14,11 @@ import {
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { DataTable } from "~/components/ui/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { LoadingElement, ButtonElement } from "~/components/elements";
 import ApiKeyForm from "~/components/api-key/ApiKeyForm";
 import ApiKeyRevealDialog from "~/components/api-key/ApiKeyRevealDialog";
+import AppKeysTab from "~/components/identity-key/AppKeysTab";
 import { useApiKeys } from "~/hooks/useApiKeys";
 import { cn } from "~/lib/utils";
 import type { ApiKey } from "~/types/api-key.types";
@@ -151,54 +153,69 @@ export default function KeysPage() {
     <div className="space-y-10 pb-16">
       <header className="border-b border-foreground/15 pb-7">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          ve-track · API keys
+          ve-track · keys
         </p>
         <h1 className="mt-3 text-[clamp(2.1rem,4.4vw,3rem)] font-bold leading-[1] tracking-tight">
           Keys.
         </h1>
         <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
-          One key per app. Each key is scoped to this tenant and can't read
-          another tenant's data.
+          API keys let your apps send usage events here. App keys let this
+          dashboard turn raw user and organization IDs into names.
         </p>
       </header>
 
-      <section className="border bg-card p-6">
-        <ApiKeyForm onSubmit={create} loading={isSubmitting} />
-      </section>
+      <Tabs defaultValue="api">
+        <TabsList>
+          <TabsTrigger value="api">API Keys</TabsTrigger>
+          <TabsTrigger value="app">App Keys</TabsTrigger>
+        </TabsList>
 
-      <section className="space-y-4">
-        <div className="flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            ── /01 · keys
-          </p>
-          <p className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground tabular-nums">
-            {liveCount} live · {revokedCount} revoked
-          </p>
-        </div>
+        <TabsContent value="api" className="space-y-10 pt-4">
+          <section className="border bg-card p-6">
+            <ApiKeyForm onSubmit={create} loading={isSubmitting} />
+          </section>
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <LoadingElement size={24} />
-          </div>
-        ) : error ? (
-          <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
-          </div>
-        ) : apiKeys.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <DataTable
-            columns={columns}
-            data={apiKeys}
-            initialSorting={[{ id: "created_at", desc: true }]}
-            searchColumnId="name"
-            searchPlaceholder="Filter by name or prefix…"
-            rowClassName={(row) => (row.revoked_at ? "opacity-60" : undefined)}
-            emptyMessage="No keys to show."
-            emptyFilteredMessage={(q) => `No keys match "${q}".`}
-          />
-        )}
-      </section>
+          <section className="space-y-4">
+            <div className="flex items-end justify-between border-b border-dashed border-foreground/15 pb-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                ── /01 · keys
+              </p>
+              <p className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground tabular-nums">
+                {liveCount} live · {revokedCount} revoked
+              </p>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <LoadingElement size={24} />
+              </div>
+            ) : error ? (
+              <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                {error}
+              </div>
+            ) : apiKeys.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={apiKeys}
+                initialSorting={[{ id: "created_at", desc: true }]}
+                searchColumnId="name"
+                searchPlaceholder="Filter by name or prefix…"
+                rowClassName={(row) =>
+                  row.revoked_at ? "opacity-60" : undefined
+                }
+                emptyMessage="No keys to show."
+                emptyFilteredMessage={(q) => `No keys match "${q}".`}
+              />
+            )}
+          </section>
+        </TabsContent>
+
+        <TabsContent value="app" className="pt-4">
+          <AppKeysTab />
+        </TabsContent>
+      </Tabs>
 
       <ApiKeyRevealDialog
         apiKey={revealedKey}
