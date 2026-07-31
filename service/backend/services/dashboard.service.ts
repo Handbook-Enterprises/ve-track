@@ -12,12 +12,17 @@ import TrackerService, {
   type TrackerContribution,
 } from "./tracker.service";
 import SettingsService from "./settings.service";
+import IdentityKeyService from "./identity-key.service";
 import { resolveIdentities } from "../lib/clerk-identities";
 import type { ApiKeyCreateBody } from "../interfaces/api-key.interface";
 import type {
   TrackerCreateBody,
   TrackerUpdateKeyBody,
 } from "../interfaces/tracker.interface";
+import type {
+  IdentityKeyCreateBody,
+  IdentityKeyUpdateBody,
+} from "../interfaces/identity-key.interface";
 import type {
   CreditsDeltas,
   CreditsOverview,
@@ -161,6 +166,37 @@ class DashboardService {
     return TrackerService.getCostDetail(db, tenantId, id, query);
   }
 
+  static async listIdentityKeys(db: DrizzleD1Database, tenantId: string) {
+    return IdentityKeyService.listForTenant(db, tenantId);
+  }
+
+  static async createIdentityKey(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    body: IdentityKeyCreateBody,
+  ) {
+    return IdentityKeyService.create(db, env, tenantId, body);
+  }
+
+  static async updateIdentityKey(
+    db: DrizzleD1Database,
+    env: Env,
+    tenantId: string,
+    id: string,
+    body: IdentityKeyUpdateBody,
+  ) {
+    return IdentityKeyService.updateKey(db, env, tenantId, id, body);
+  }
+
+  static async removeIdentityKey(
+    db: DrizzleD1Database,
+    tenantId: string,
+    id: string,
+  ) {
+    return IdentityKeyService.remove(db, tenantId, id);
+  }
+
   static async getOverview(
     db: DrizzleD1Database,
     env: Env,
@@ -196,7 +232,13 @@ class DashboardService {
     const orgIds = byOrg.groups
       .map((g) => g.key)
       .filter((id): id is string => !!id);
-    const { users, orgs } = await resolveIdentities(env, userIds, orgIds);
+    const { users, orgs } = await resolveIdentities(
+      env,
+      db,
+      tenantId,
+      userIds,
+      orgIds,
+    );
 
     const enrich = (
       groups: UsageGroup[],
@@ -365,7 +407,13 @@ class DashboardService {
     const orgIds = byOrg.groups
       .map((g) => g.key)
       .filter((id): id is string => !!id);
-    const { users, orgs } = await resolveIdentities(env, userIds, orgIds);
+    const { users, orgs } = await resolveIdentities(
+      env,
+      db,
+      tenantId,
+      userIds,
+      orgIds,
+    );
 
     const enrich = (
       groups: ProfitabilityGroup[],
