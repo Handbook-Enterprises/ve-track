@@ -26,6 +26,10 @@ dashboardRouter.delete("/trackers/:id", DashboardController.disconnectTrackerCon
 dashboardRouter.post("/trackers/:id/sync", DashboardController.syncTrackerController);
 dashboardRouter.get("/trackers/:id/costs", DashboardController.trackerCostsController);
 dashboardRouter.patch("/trackers/:id", DashboardController.updateTrackerController);
+dashboardRouter.get("/identity-keys", DashboardController.listIdentityKeysController);
+dashboardRouter.post("/identity-keys", DashboardController.createIdentityKeyController);
+dashboardRouter.patch("/identity-keys/:id", DashboardController.updateIdentityKeyController);
+dashboardRouter.delete("/identity-keys/:id", DashboardController.removeIdentityKeyController);
 dashboardRouter.get("/overview", DashboardController.overviewController);
 dashboardRouter.get("/credits", DashboardController.creditsController);
 dashboardRouter.post("/canary", DashboardController.canaryController);

@@ -119,6 +119,50 @@ class DashboardController {
     return c.json(data, HTTP_STATUS_CODES.SUCCESS);
   }
 
+  static async listIdentityKeysController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const [error, data] = await manageAsyncOps(
+      DashboardService.listIdentityKeys(db, tenantId),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async createIdentityKeyController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const body = await c.req.json();
+    const [error, data] = await manageAsyncOps(
+      DashboardService.createIdentityKey(db, c.env, tenantId, body),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async updateIdentityKeyController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const id = c.req.param("id")!;
+    const body = await c.req.json();
+    const [error, data] = await manageAsyncOps(
+      DashboardService.updateIdentityKey(db, c.env, tenantId, id, body),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
+  static async removeIdentityKeyController(c: DashContext) {
+    const db = drizzle(c.env.DB);
+    const tenantId = c.get("tenantId");
+    const id = c.req.param("id")!;
+    const [error, data] = await manageAsyncOps(
+      DashboardService.removeIdentityKey(db, tenantId, id),
+    );
+    if (error) throw error;
+    return c.json(data, HTTP_STATUS_CODES.SUCCESS);
+  }
+
   static async updateTrackerController(c: DashContext) {
     const db = drizzle(c.env.DB);
     const tenantId = c.get("tenantId");
