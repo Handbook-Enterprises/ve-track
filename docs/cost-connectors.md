@@ -48,7 +48,7 @@ What each supported provider exposes to a connected key, the auth it needs, the 
 | Perplexity | ❌ no public cost API | dashboard only (by model, by key) | — | — | fallback: SDK per-request cost or manual import | 3 |
 | Gemini (Google) | ❌ no per-key cost API | Cloud Billing → BigQuery export | GCP service account | billing account / project | project labels | 3 |
 | Serper | ❌ no public account/billing API | dashboard only (credits used, 24h/30d) | — | — | parked; possible undocumented `/account` route (unverified) | parked |
-| Cloro | ❌ no account API | credits only inline per request (`X-Credits-Charged`) | — | — | parked; SDK-side accumulation only | parked |
+| Cloro | ❌ no account API | flat monthly plan; credits reported inline per task | — | — | parked; cost is app-reported via `trackUsage` (SDK no longer prices Cloro) | parked |
 
 Legend: ✅ historical cost reachable · ⚠️ point-in-time only (balance/remaining → derive spend by diffing snapshots) · ❌ no usable API (fallback to SDK capture or manual/CSV import).
 
@@ -103,7 +103,9 @@ Sourcing strategies:
 - **Balance accumulator (USD, since connected):** Fal exposes only `current_balance`. `sync()` converts a balance-only result into a running `total_usage_usd` by adding `max(0, prevBalance − currBalance)` each pull (top-ups read as 0, never negative). Starts at $0 on connect, so it is **since-connected**, not true lifetime.
 - **Credits, not dollars (`credits_used` kind):** Firecrawl exposes credits with no USD field. We sum the historical endpoint's `periods[].totalCredits` into `total_usage_credits` and render **Total Credits** + **Credits per day** (`isMoney = false`; the chart formats as plain numbers). No daily granularity from Firecrawl, so the per-day figure comes from our snapshot differencing.
 
-**Parked (no usable account API):** Serper (dashboard-only; a `/account` route may exist but is undocumented/unverified) and Cloro (credits only reported inline per request via `X-Credits-Charged`). Neither can be a scheduled connector pull today.
+**Parked (no usable account API):** Serper (dashboard-only; a `/account` route may exist but is undocumented/unverified) and Cloro (a flat monthly plan, with credits reported inline per task). Neither can be a scheduled connector pull today.
+
+**Cloro is no longer priced by the SDK (v0.11.0).** Cloro bills a fixed monthly fee for a credit allowance, so the dollar value of one credit is a function of the plan and changes on every upgrade. The SDK carried a hardcoded rate that drifted ~108x above the real blended rate, and it priced the async status-poll endpoint, which restates a completed task's `creditsCharged` on every poll and so re-booked the same task repeatedly. The `cloro` provider entry has been removed: consuming apps own the plan rate and report `costUsd` explicitly via `trackUsage`, once, when their own record of the task reaches a terminal state.
 
 **Storage + history (`0020_tracker_metric_snapshots.sql`, `0021_tracker_total_usage.sql`, `0022_tracker_daily_spend.sql`).** The latest metrics live on the `trackers` row (`monthly_spend`, `weekly_spend`, `balance_usd`, `total_usage_usd`, `credits_remaining`, `request_count`). A daily snapshot of those metrics — plus the derived `daily_spend` — is written to the **`tracker_snapshots`** table (one row per tracker per day, id `<trackerId>_<day>`, upsert), which powers the trend chart.
 
@@ -113,7 +115,7 @@ Sourcing strategies:
 
 **Retired:** the snapshot-diff path, `pullCumulativeTotal`, `pullDailyCosts`/`pullDailyRequests`, and writing tracker spend into `usage_events`. The `cost_snapshot` column (`0019`) and the `tracker_costs` table are now legacy (left in place, no longer written; `tracker_costs` is cleared on disconnect).
 
-**Phase 3 — Partial / heavy / none: BrightData, Firecrawl (balance-delta), Gemini (Cloud Billing/BigQuery), Perplexity + Cloro (SDK capture or manual CSV import).**
+**Phase 3 — Partial / heavy / none: BrightData, Firecrawl (balance-delta), Gemini (Cloud Billing/BigQuery), Perplexity (SDK capture or manual CSV import); Cloro is app-reported.**
 
 ---
 
@@ -135,7 +137,7 @@ Storing customers' **admin** keys makes VE Track a top-tier breach target — on
 - Confirm exact OpenAI org-id endpoint (`/v1/me`) returns a stable hashable org id for dedup.
 - Anthropic: confirm an org identifier is readable from the admin key for dedup.
 - BrightData / Firecrawl: confirm whether any historical spend endpoint exists before settling on balance-diffing.
-- Perplexity / Cloro: confirm no programmatic cost API before committing to manual import.
+- Perplexity: confirm no programmatic cost API before committing to manual import. (Cloro resolved: app-reported cost, see above.)
 - Reconciliation: define the join key between a connected account and existing SDK events (provider + project/key → app/user mapping).
 
 ---

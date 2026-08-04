@@ -19,6 +19,7 @@ export interface TrackUsageInput {
     orgId?: string | null;
     creditsCharged?: number | null;
     creditPriceUsd?: number | null;
+    correlationId?: string | null;
 }
 export declare function trackUsage(usage: TrackUsageInput): void;
 export interface TrackCreditsInput {
@@ -28,6 +29,7 @@ export interface TrackCreditsInput {
     creditPriceUsd?: number | null;
     userId?: string | null;
     orgId?: string | null;
+    correlationId?: string | null;
 }
 export declare function trackCredits(input: TrackCreditsInput): void;
 export declare function getCurrentScope(): RequestScope | undefined;
