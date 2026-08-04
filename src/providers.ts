@@ -68,18 +68,7 @@ const computeCost = (
   return Math.round(cost * 1_000_000) / 1_000_000;
 };
 
-const CLORO_USD_PER_CREDIT = 0.04;
 const FAL_IMAGE_USD = 0.01;
-
-export const cloroCreditsToUsd = (credits: number): number =>
-  Math.round(credits * CLORO_USD_PER_CREDIT * 1_000_000) / 1_000_000;
-
-const CLORO_SYNC_ENDPOINTS: Array<{ match: RegExp; credits: number; model: string }> = [
-  { match: /\/monitor\/chatgpt/i, credits: 7, model: "chatgpt" },
-  { match: /\/monitor\/perplexity/i, credits: 5, model: "perplexity" },
-  { match: /\/monitor\/gemini/i, credits: 6, model: "gemini" },
-  { match: /\/monitor\/aimode/i, credits: 6, model: "aimode" },
-];
 
 const enableStreamUsage = (init: RequestInit): void => {
   if (typeof init.body !== "string") return;
@@ -332,28 +321,6 @@ export const PROVIDERS: Provider[] = [
         completionTokens,
         cachedInputTokens: cached,
       };
-    },
-  },
-  {
-    name: "cloro",
-    match: (u) => u.includes("api.cloro.dev"),
-    extract: async (resp) => {
-      try {
-        if (/\/async\/task\/?$/i.test(new URL(resp.url).pathname)) return null;
-      } catch {
-        /* */
-      }
-      const j: any = await resp.json().catch(() => null);
-      const credits = j?.credits?.creditsCharged ?? j?.credits?.creditsToCharge;
-      const taskType = j?.task?.taskType ?? j?.result?.taskType;
-      const sync = CLORO_SYNC_ENDPOINTS.find((s) => s.match.test(resp.url));
-      const model =
-        typeof taskType === "string" ? taskType.toLowerCase() : (sync?.model ?? null);
-      if (typeof credits === "number") {
-        return { costUsd: cloroCreditsToUsd(credits), model: model ?? undefined };
-      }
-      if (!sync || !resp.ok) return null;
-      return { costUsd: cloroCreditsToUsd(sync.credits), model: sync.model };
     },
   },
   {

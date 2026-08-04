@@ -1,6 +1,6 @@
 # @viewengine/track
 
-One install, one wrapper line, and every provider fetch your app makes (OpenAI, Anthropic, Gemini, OpenRouter, Perplexity, Cloro, Fal, Zyte, DataForSEO, Apify, Firecrawl, BrightData, …) is auto-attributed to your app, your Clerk org, your end user, and the action they were doing — live on your dashboard at [track.viewengine.ai](https://track.viewengine.ai).
+One install, one wrapper line, and every provider fetch your app makes (OpenAI, Anthropic, Gemini, OpenRouter, Perplexity, Fal, Zyte, DataForSEO, Apify, Firecrawl, BrightData, …) is auto-attributed to your app, your Clerk org, your end user, and the action they were doing — live on your dashboard at [track.viewengine.ai](https://track.viewengine.ai).
 
 This README is the integration guide. For pricing internals, architecture, dashboard, self-host, and version history, see the [CHANGELOG](./CHANGELOG.md).
 
@@ -192,6 +192,20 @@ trackUsage({
 
 It inherits the current scope's `app`, user, org, and `action` — override any per call. Outside a scope it's a silent no-op, so it's safe to leave in. For a provider you hit repeatedly, add it to `src/providers.ts` instead (see [Providers](#providers)).
 
+**Flat-plan providers belong here, not in `src/providers.ts`.** If you pay a fixed monthly fee for an allowance rather than per call, the dollar value of one unit depends on your plan, which the SDK cannot know and which changes whenever you upgrade. Keep the plan rate in your app as the single source of truth and report `costUsd` yourself. A rate hardcoded in the SDK goes stale silently and mis-states every call that uses it.
+
+The same applies when the response that reveals the cost is not the response to your own fetch — an async job whose result arrives by inbound webhook, say. The fetch hook only sees outbound calls, so book the cost from wherever your app learns it, once, at a point you can guarantee runs exactly once.
+
+### Correlating events with your own records
+
+Pass `correlationId` on `trackUsage` or `trackCredits` to store your own id (a job id, task id, or row id) alongside the event:
+
+```ts
+trackUsage({ provider: "acme", costUsd: 0.0031, correlationId: task.id });
+```
+
+The dashboard indexes it per tenant, so you can join ve-track events back to your database and prove the two agree.
+
 ### Credits
 
 If your app bills users in credits (we use [Autumn](https://useautumn.com)), report each deduction with `trackCredits` right after the billing call succeeds. The dashboard then shows credit usage per app, action, user, org, provider, and model, alongside cost:
@@ -260,7 +274,6 @@ These domains are auto-detected and priced for you — no config:
 | Google Gemini | `generativelanguage.googleapis.com`, `aiplatform.googleapis.com` |
 | OpenRouter | `openrouter.ai/api` |
 | Perplexity | `api.perplexity.ai` |
-| Cloro | `api.cloro.dev` |
 | Fal | `fal.run` |
 | Zyte | `api.zyte.com` |
 | DataForSEO | `api.dataforseo.com` |

@@ -159,6 +159,7 @@ export function trackUsage(usage) {
         status_code: usage.statusCode ?? null,
         credits_charged: usage.creditsCharged ?? null,
         credit_price_usd_at_event: usage.creditPriceUsd ?? null,
+        correlation_id: usage.correlationId ?? null,
     };
     scope.buffer.push(event);
     if (scope.resolveIdentity && usage.userId === undefined && usage.orgId === undefined) {
@@ -190,6 +191,7 @@ export function trackCredits(input) {
         status_code: null,
         credits_charged: input.credits,
         credit_price_usd_at_event: input.creditPriceUsd ?? null,
+        correlation_id: input.correlationId ?? null,
     };
     scope.buffer.push(event);
     if (scope.resolveIdentity && input.userId === undefined && input.orgId === undefined) {
