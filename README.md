@@ -63,6 +63,7 @@ That's it. Every external provider fetch is now intercepted, priced, attributed 
 | `trackUsage(usage)` | Manually emit one event from inside a scope — for a provider the lib doesn't auto-detect, or a cost you compute yourself. See [Manual events](#manual-events). |
 | `trackCredits(input)` | Report a credit deduction (e.g. from Autumn's `track`) so credit usage shows up per app/action/user/org on the dashboard. See [Manual events](#manual-events). |
 | `withUser({ userId, orgId }, fn)` | Override user/org for a block. Rare. |
+| `flush()` | Ship buffered events now. Call at phase boundaries of long-running scopes (crons) so a killed isolate cannot take the buffer with it. See [Long-running scopes](#long-running-scopes-flush-between-phases). |
 | `getCurrentScope()` | Inspect what's currently being tracked. Debugging only. |
 
 ---
@@ -195,6 +196,23 @@ It inherits the current scope's `app`, user, org, and `action` — override any 
 **Flat-plan providers belong here, not in `src/providers.ts`.** If you pay a fixed monthly fee for an allowance rather than per call, the dollar value of one unit depends on your plan, which the SDK cannot know and which changes whenever you upgrade. Keep the plan rate in your app as the single source of truth and report `costUsd` yourself. A rate hardcoded in the SDK goes stale silently and mis-states every call that uses it.
 
 The same applies when the response that reveals the cost is not the response to your own fetch — an async job whose result arrives by inbound webhook, say. The fetch hook only sees outbound calls, so book the cost from wherever your app learns it, once, at a point you can guarantee runs exactly once.
+
+### Long-running scopes: flush between phases
+
+Events buffer in memory and ship once, at the end of the scope. That is right for a request and wrong for a cron that runs for minutes: if the isolate is killed (platform wall clock, OOM) the end-of-scope flush never runs and the whole buffer is lost. Anything you gated on a database write will never be re-emitted.
+
+Call `flush()` at each phase boundary of a long job:
+
+```ts
+import { flush } from "@viewengine/track";
+
+for (const phase of phases) {
+  await phase.run();
+  await flush();   // the preceding phase's events are now durable
+}
+```
+
+It no-ops outside a scope and on an empty buffer, so it is safe to leave in. As a backstop, the SDK also flushes automatically once 50 events are buffered.
 
 ### Correlating events with your own records
 

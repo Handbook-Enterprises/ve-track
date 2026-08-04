@@ -4,6 +4,18 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.12.0 — 2026-08-04
+
+### Eager flush: long-lived scopes no longer lose their buffer when the isolate dies
+
+Events were delivered exactly once, from `runScope`'s `finally`, at the END of the scope. For an HTTP request that is right. For a Worker cron it is not: the scope spans the whole invocation, and an invocation killed at the platform wall clock or by an OOM never runs that `finally`. Everything buffered dies with the isolate — and if the caller gated the event on a database CAS (the correct way to make cost booking idempotent), it will never be re-emitted, because the row is already terminal.
+
+This was not theoretical. In the first app to book money this way, `sweep_runs` measured the phase that gates the flush dying on ~4% of ticks, taking every earlier phase's events with it. The error direction is undercount, which is the safe one, but it is silent.
+
+- **`flush()`** — new export. Ships everything buffered so far, immediately. Call it at the end of each phase of a long job to make that phase's events durable. No-ops outside a scope and on an empty buffer; `flushEvents` splices the buffer synchronously, so concurrent flushes cannot double-send. It awaits in-flight extractions and resolves identity first, so a flushed event never goes out with an attribution that was about to be filled in.
+- **Automatic flush at 50 buffered events** — a safety net for high-volume scopes that never call `flush()` themselves. Runs through `ctx.waitUntil` and is registered in `scope.pending`, so the end-of-scope barrier still awaits it. **Suppressed while identity is unresolved**: a scope using lazy `resolveUser` waits for the end-of-scope flush rather than shipping events with a null user/org that `backfillIdentity` can no longer patch.
+- **No breaking changes.** Apps that do nothing get the auto-flush safety net; apps with long-lived scopes should add `flush()` calls at their phase boundaries.
+
 ## v0.11.0 — 2026-08-04
 
 ### Cloro pricing removed from the SDK; `correlationId` on manual events

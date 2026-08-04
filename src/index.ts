@@ -11,6 +11,7 @@ export {
   getCurrentScope,
   trackUsage,
   trackCredits,
+  flush,
 } from "./hook.js";
 export type { TrackUsageInput, TrackCreditsInput } from "./hook.js";
 export { PROVIDERS } from "./providers.js";

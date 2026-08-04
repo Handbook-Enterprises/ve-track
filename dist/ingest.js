@@ -3,6 +3,25 @@ export function captureOriginalFetch() {
     if (!originalFetch)
         originalFetch = globalThis.fetch.bind(globalThis);
 }
+export const AUTO_FLUSH_AT = 50;
+export function maybeAutoFlush(scope) {
+    if (scope.buffer.length < AUTO_FLUSH_AT)
+        return;
+    // Never ship while identity is still unresolved. `backfillIdentity` patches
+    // buffered events in place once the resolver runs; anything flushed before
+    // that goes out with a null user/org and cannot be corrected afterwards.
+    // Scopes that resolve lazily wait for the end-of-scope flush instead.
+    if (scope.resolveIdentity)
+        return;
+    const task = flushEvents(scope);
+    scope.pending?.push(task);
+    try {
+        scope.ctx.waitUntil(task);
+    }
+    catch {
+        /* */
+    }
+}
 export async function flushEvents(scope) {
     if (!scope.apiKey) {
         return;
