@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { PROVIDERS } from "./providers.js";
-import { captureOriginalFetch, flushEvents } from "./ingest.js";
+import { captureOriginalFetch, flushEvents, maybeAutoFlush } from "./ingest.js";
 import type {
   Provider,
   RequestScope,
@@ -111,6 +111,7 @@ export function installFetchHook(): void {
       };
 
       scope.buffer.push(event);
+      maybeAutoFlush(scope);
     })();
 
     scope.pending.push(extractTask);
@@ -214,6 +215,7 @@ export function trackUsage(usage: TrackUsageInput): void {
   if (scope.resolveIdentity && usage.userId === undefined && usage.orgId === undefined) {
     scope.unattributed?.push(event);
   }
+  maybeAutoFlush(scope);
 }
 
 export interface TrackCreditsInput {
@@ -256,6 +258,33 @@ export function trackCredits(input: TrackCreditsInput): void {
   if (scope.resolveIdentity && input.userId === undefined && input.orgId === undefined) {
     scope.unattributed?.push(event);
   }
+  maybeAutoFlush(scope);
+}
+
+/**
+ * Ship everything buffered so far, now.
+ *
+ * Events are normally delivered once, from `runScope`'s `finally`, at the END of
+ * the whole scope. That is fine for a short request and WRONG for a long-lived
+ * one: a Worker cron that is killed at the platform wall clock, or by an OOM,
+ * never runs that `finally`, and every event it buffered dies with the isolate.
+ * The work was already done and, if the caller gated it on a database CAS, it
+ * will never be re-emitted.
+ *
+ * Call this at the end of each phase of a long job to make the preceding phase's
+ * events durable. Safe to call anywhere: it no-ops outside a scope and when the
+ * buffer is empty, and `flushEvents` splices the buffer synchronously, so
+ * concurrent flushes cannot double-send.
+ */
+export async function flush(): Promise<void> {
+  const scope = requestContext.getStore();
+  if (!scope) return;
+  await Promise.allSettled(scope.pending ?? []);
+  // Resolve identity BEFORE shipping, for the same reason maybeAutoFlush
+  // refuses to ship without it: an event flushed with a null user/org keeps
+  // that null forever.
+  await backfillIdentity(scope);
+  await flushEvents(scope);
 }
 
 export function getCurrentScope(): RequestScope | undefined {
