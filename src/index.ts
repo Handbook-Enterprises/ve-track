@@ -13,7 +13,7 @@ export {
   trackCredits,
 } from "./hook.js";
 export type { TrackUsageInput, TrackCreditsInput } from "./hook.js";
-export { PROVIDERS, cloroCreditsToUsd } from "./providers.js";
+export { PROVIDERS } from "./providers.js";
 export type {
   TrackedHandlerConfig,
   UserResolver,

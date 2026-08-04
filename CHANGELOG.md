@@ -4,6 +4,19 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.11.0 — 2026-08-04
+
+### Cloro pricing removed from the SDK; `correlationId` on manual events
+
+The `cloro` provider entry priced every `api.cloro.dev` response at a hardcoded `$0.04` per credit. Cloro is a flat monthly plan, so a credit is worth the plan price divided by the plan allowance — for the first app to hit this, `$500 / 1,350,000 = $0.00037`. The SDK was overstating every Cloro credit by roughly 108x, and the rate silently went further out of date on every plan upgrade.
+
+The extractor also skipped only the bare submit path (`/async/task`) and therefore priced the async **status poll** (`/async/task/:id`). That response restates a completed task's `credits.creditsCharged` forever, so a reconcile sweep polling a task re-booked its full cost on every poll. Meanwhile the async result itself arrives by inbound webhook, which the outbound fetch hook never sees — so a Cloro task that succeeded normally recorded no cost at all. Net effect: the Cloro line measured dropped webhooks, at 108x the real price.
+
+- **Breaking: the `cloro` provider is removed** from `src/providers.ts`, along with the exported `cloroCreditsToUsd` helper. `api.cloro.dev` calls are no longer auto-detected or priced, and no longer emit events. Apps that use Cloro must report cost themselves with `trackUsage({ provider: "cloro", costUsd, … })`, computed from their own plan rate, at a point that runs exactly once per task. This is the correct home for any flat-plan provider: the plan rate is app knowledge, not SDK knowledge. Removing the entry rather than nulling its price is deliberate — it makes double-booking impossible rather than merely unlikely.
+- **`correlationId` on `trackUsage` and `trackCredits`** — stores your own id (task, job, or row) on the event as `correlation_id`. The service column and its per-tenant index have existed since `0010_credits_and_pricing.sql` and ingest already mapped the field; only the SDK could not send it. Lets you join ve-track events back to your own database and verify the two agree per record instead of per day.
+- **No migration and no service change.** Historical `provider = 'cloro'` rows keep their wrong `cost_usd`; restate them to `NULL` with `cost_confidence = 'unknown'` if you want the dashboard to stop reporting phantom spend (rescaling is not safe — the re-booked polls are not separable without a correlation id, which those rows predate).
+- **Other providers are untouched.** Any consumer that does not call Cloro is unaffected by this release.
+
 ## v0.10.0 — 2026-07-30
 
 ### App Keys: name resolution across multiple Clerk instances

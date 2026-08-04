@@ -30,6 +30,7 @@ export interface VeTrackEvent {
     status_code: number | null;
     credits_charged?: number | null;
     credit_price_usd_at_event?: number | null;
+    correlation_id?: string | null;
 }
 export interface RequestScope {
     ctx: ExecutionContext;

@@ -183,6 +183,7 @@ export interface TrackUsageInput {
   orgId?: string | null;
   creditsCharged?: number | null;
   creditPriceUsd?: number | null;
+  correlationId?: string | null;
 }
 
 export function trackUsage(usage: TrackUsageInput): void {
@@ -207,6 +208,7 @@ export function trackUsage(usage: TrackUsageInput): void {
     status_code: usage.statusCode ?? null,
     credits_charged: usage.creditsCharged ?? null,
     credit_price_usd_at_event: usage.creditPriceUsd ?? null,
+    correlation_id: usage.correlationId ?? null,
   };
   scope.buffer.push(event);
   if (scope.resolveIdentity && usage.userId === undefined && usage.orgId === undefined) {
@@ -221,6 +223,7 @@ export interface TrackCreditsInput {
   creditPriceUsd?: number | null;
   userId?: string | null;
   orgId?: string | null;
+  correlationId?: string | null;
 }
 
 export function trackCredits(input: TrackCreditsInput): void {
@@ -247,6 +250,7 @@ export function trackCredits(input: TrackCreditsInput): void {
     status_code: null,
     credits_charged: input.credits,
     credit_price_usd_at_event: input.creditPriceUsd ?? null,
+    correlation_id: input.correlationId ?? null,
   };
   scope.buffer.push(event);
   if (scope.resolveIdentity && input.userId === undefined && input.orgId === undefined) {
