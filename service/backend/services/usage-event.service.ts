@@ -1,6 +1,7 @@
 import { DrizzleD1Database } from "drizzle-orm/d1";
 import { UsageEventRepository } from "../repositories/usage-event.repository";
 import { ActionRepository } from "../repositories/action.repository";
+import ProviderCreditPriceRepository from "../repositories/provider-credit-price.repository";
 import PricingService, { REPRICE_PROVIDERS } from "./pricing.service";
 import SettingsService from "./settings.service";
 import { UsageEventMessages } from "../messages/usage-event.messages";
@@ -126,10 +127,25 @@ class UsageEventService {
       (e) => e.credits_charged != null && e.credit_price_usd_at_event == null,
     );
     let defaultCreditPrice: number | null = null;
+    let providerCreditPrices: Map<string, number> = new Map();
     if (needsDefaultPrice) {
-      const settings = await SettingsService.resolve(db, tenantId);
+      const [settings, perProvider] = await Promise.all([
+        SettingsService.resolve(db, tenantId),
+        ProviderCreditPriceRepository.fetchMap(db, tenantId),
+      ]);
       defaultCreditPrice = settings.credit_price_usd;
+      providerCreditPrices = perProvider;
     }
+
+    /**
+     * USD per credit for one provider: its own configured rate, else the
+     * tenant-wide fallback. Per-provider first because the rates differ by
+     * roughly two orders of magnitude — an Ahrefs unit is ~$0.0006 and a Rapid
+     * URL Indexer submission is ~$0.045 — so a single shared number is wrong
+     * for everything it is not set from.
+     */
+    const creditRateFor = (provider: string): number | null =>
+      providerCreditPrices.get(provider) ?? defaultCreditPrice;
 
     let mergedActions: Map<string, string> | null = null;
     if (valid.some((e) => e.action)) {
@@ -164,6 +180,25 @@ class UsageEventService {
         }
       }
 
+      // Credit-billed providers (Ahrefs units, Local Falcon pins, Rapid URL
+      // Indexer submissions) report consumption but never dollars, because the
+      // rate depends on the account's plan. The rate was already being stamped
+      // onto the row, but nothing ever multiplied by it — credits and cost_usd
+      // were reported as two unrelated columns, so every credit-billed call
+      // aggregated as $0 and looked free. Convert here, at ingest, so the
+      // existing dashboard sums pick it up with no read-side change.
+      const creditRate =
+        e.credit_price_usd_at_event ??
+        (e.credits_charged != null ? creditRateFor(e.provider) : null);
+      if (cost_usd == null && e.credits_charged != null && creditRate != null) {
+        cost_usd = e.credits_charged * creditRate;
+        cost_source = "credit_rate";
+        // Not "high": it is exact arithmetic on a rate a human typed, which is
+        // only as good as the plan it was derived from and goes stale silently
+        // when the plan changes.
+        cost_confidence = "medium";
+      }
+
       return {
         id: e.id,
         tenant_id: tenantId,
@@ -187,7 +222,7 @@ class UsageEventService {
         credits_charged: e.credits_charged ?? null,
         credit_price_usd_at_event:
           e.credit_price_usd_at_event ??
-          (e.credits_charged != null ? defaultCreditPrice : null),
+          (e.credits_charged != null ? creditRateFor(e.provider) : null),
         correlation_id: e.correlation_id ?? null,
       };
     });
