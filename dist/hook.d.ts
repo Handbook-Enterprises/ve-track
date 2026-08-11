@@ -1,4 +1,4 @@
-import type { RequestScope, VeTrackUser } from "./types.js";
+import type { CostSourceProvenance, RequestScope, VeTrackUser } from "./types.js";
 export declare function installFetchHook(): void;
 export declare function runScope<T>(scope: RequestScope, handler: () => Promise<T> | T): Promise<T>;
 export declare function withUser<T>(user: VeTrackUser, handler: () => Promise<T> | T): Promise<T>;
@@ -6,6 +6,7 @@ export declare function withAction<T>(action: string, handler: () => Promise<T> 
 export interface TrackUsageInput {
     provider: string;
     costUsd?: number | null;
+    costSource?: CostSourceProvenance;
     model?: string | null;
     promptTokens?: number | null;
     completionTokens?: number | null;

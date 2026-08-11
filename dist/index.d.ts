@@ -5,5 +5,5 @@ export { clerkUserResolver } from "./clerk.js";
 export { installFetchHook, runScope, withUser, withAction, getCurrentScope, trackUsage, trackCredits, } from "./hook.js";
 export type { TrackUsageInput, TrackCreditsInput } from "./hook.js";
 export { PROVIDERS } from "./providers.js";
-export type { TrackedHandlerConfig, UserResolver, VeTrackUser, VeTrackUsage, VeTrackEvent, Provider, RequestScope, } from "./types.js";
+export type { CostSourceProvenance, TrackedHandlerConfig, UserResolver, VeTrackUser, VeTrackUsage, VeTrackEvent, Provider, RequestScope, } from "./types.js";
 //# sourceMappingURL=index.d.ts.map
