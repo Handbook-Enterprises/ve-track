@@ -4,13 +4,14 @@ export interface VeTrackUser {
 }
 
 export interface VeTrackUsage {
-  costUsd: number;
+  costUsd: number | null;
   model?: string;
   promptTokens?: number;
   completionTokens?: number;
   cachedInputTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
+  creditsCharged?: number;
 }
 
 export interface VeTrackEvent {

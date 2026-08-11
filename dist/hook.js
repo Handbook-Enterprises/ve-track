@@ -89,6 +89,7 @@ export function installFetchHook() {
                 latency_ms: latencyMs,
                 cost_usd: usage?.costUsd ?? null,
                 status_code: response.status,
+                credits_charged: usage?.creditsCharged ?? null,
             };
             scope.buffer.push(event);
         })();

@@ -16,6 +16,7 @@
     "postinstall": "npm run cf-typegen",
     "preview": "npm run build && vite preview",
     "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=viewengine --project=viewengine-platform && sentry-cli sourcemaps upload --org=viewengine --project=viewengine-platform --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
+    "test": "bun test",
     "typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
   },
   "dependencies": {
