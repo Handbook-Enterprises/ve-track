@@ -135,15 +135,44 @@ jobs:
             --command "SELECT provider, action, model, cost_usd, credits_charged, cost_source, cost_confidence, status_code, timestamp FROM usage_events ORDER BY timestamp DESC LIMIT 15"
           echo "::endgroup::"
 
-          # Mirrors resolveEntry: exact id first, then the normalized form with a
-          # trailing -YYYY-MM-DD or -NNNNNNNN stripped. An exact-only check
+          # Mirrors resolveEntry: exact id first, then the normalized form with
+          # a trailing -YYYY-MM-DD or -NNNNNNNN stripped. An exact-only check
           # reports NO MATCH for ids like `gpt-5-2025-08-07` that the pricer
           # resolves perfectly well, and a diagnostic that cries wolf is worse
           # than none. It still does not model resolveEntry's prefix fallback,
           # so NO MATCH here means "needs a look", not "definitely unpriced".
+          #
+          # The suffix is stripped from the EVENT side with a constant GLOB.
+          # Building a GLOB pattern from a column value fails with
+          # "LIKE or GLOB pattern too complex" (SQLITE_ERROR 7500).
           echo "::group::do repriced-provider model ids resolve against the catalog"
           bunx wrangler d1 execute "$DB" --remote \
-            --command "WITH ev AS (SELECT provider, model, COUNT(*) AS events, lower(model) AS raw, replace(replace(lower(model), substr(lower(model), length(lower(model)) - 10, 11), ''), '  ', '') AS unused FROM usage_events WHERE provider IN ('openai','anthropic','gemini','openrouter') AND model IS NOT NULL AND timestamp > (strftime('%s','now') - 172800) * 1000 GROUP BY 1,2) SELECT ev.provider, ev.model, ev.events, CASE WHEN EXISTS (SELECT 1 FROM model_pricing p WHERE p.provider = ev.provider AND (lower(p.model_id) = ev.raw OR ev.raw GLOB lower(p.model_id) || '-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR ev.raw GLOB lower(p.model_id) || '-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')) THEN 'resolves' ELSE 'NO MATCH' END AS catalog FROM ev ORDER BY ev.events DESC LIMIT 20"
+            --command "
+              WITH ev AS (
+                SELECT provider, model, COUNT(*) AS events, lower(model) AS raw
+                  FROM usage_events
+                 WHERE provider IN ('openai','anthropic','gemini','openrouter')
+                   AND model IS NOT NULL
+                   AND timestamp > (strftime('%s','now') - 172800) * 1000
+                 GROUP BY 1, 2
+              ), norm AS (
+                SELECT ev.*,
+                       CASE
+                         WHEN raw GLOB '*-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN substr(raw, 1, length(raw) - 11)
+                         WHEN raw GLOB '*-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'   THEN substr(raw, 1, length(raw) - 9)
+                         ELSE raw
+                       END AS stripped
+                  FROM ev
+              )
+              SELECT n.provider, n.model, n.events,
+                     CASE WHEN EXISTS (
+                       SELECT 1 FROM model_pricing p
+                        WHERE p.provider = n.provider
+                          AND lower(p.model_id) IN (n.raw, n.stripped)
+                     ) THEN 'resolves' ELSE 'NO MATCH' END AS catalog
+                FROM norm n
+               ORDER BY n.events DESC
+               LIMIT 20"
           echo "::endgroup::"
 
           echo "::group::configured credit rates"
