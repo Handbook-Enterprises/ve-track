@@ -10,9 +10,18 @@ const PROVIDER_SYNC: Array<{ catalogId: string; sdkName: string }> = [
   { catalogId: "anthropic", sdkName: "anthropic" },
   { catalogId: "google", sdkName: "gemini" },
   { catalogId: "perplexity", sdkName: "perplexity" },
+  // models.dev carries OpenRouter's catalogue under its own node, keyed by the
+  // same `author/slug` ids OpenRouter reports on the response, so no id
+  // translation is needed here.
+  { catalogId: "openrouter", sdkName: "openrouter" },
 ];
 
-export const REPRICE_PROVIDERS = new Set(["openai", "anthropic", "gemini"]);
+export const REPRICE_PROVIDERS = new Set([
+  "openai",
+  "anthropic",
+  "gemini",
+  "openrouter",
+]);
 
 export interface PriceEntry {
   input_per_m: number;
@@ -119,6 +128,15 @@ class PricingService {
       if (!models) continue;
       for (const modelId of Object.keys(models)) {
         const cost = models[modelId]?.cost ?? {};
+        // models.dev ships an empty `cost` object for anything it has no token
+        // pricing for: image and video models, and OpenRouter's routing
+        // pseudo-models such as `openrouter/auto`. Coercing those to 0 would
+        // make the pricer report them as free at "high" confidence, and worse,
+        // overwrite a dollar figure the vendor actually stated. Skip them so
+        // resolveEntry misses and the client's own number survives as
+        // "estimate". An explicit `input: 0` is a different claim, that the
+        // model really is free, and is kept.
+        if (cost.input == null && cost.output == null) continue;
         rows.push({
           provider: sdkName,
           model_id: modelId,
