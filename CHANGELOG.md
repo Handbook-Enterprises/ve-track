@@ -4,6 +4,21 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.12.0 — 2026-08-10
+
+### A rejected ingest is no longer reported as a success; four new provider matchers
+
+`flushEvents` posted the batch, read the response body, and threw it away without ever inspecting `res.status`. A revoked, wrong, or expired API key returns 401 and the SDK reported success forever, losing every event silently. This is the worst failure mode this system has: absence of data is indistinguishable from absence of spend, and nothing anywhere says otherwise.
+
+- **`flushEvents` now logs a non-2xx** with the HTTP status, the count of events lost, and a truncated slice of the response body. This is observability, not retry: the buffer is drained before the request, so the events are gone either way, and silently swallowing that is the actual defect. Matches what ve-brain's own hand-rolled sender has always done.
+- **Four provider matchers added** for hosts the fetch hook previously did not recognise at all, so apps on the hook path recorded nothing for them.
+  - `ahrefs` (`api.ahrefs.com`) reports **units consumed** from the `x-api-units-cost-total-actual` response header, which the client had been discarding. Note the `-total` variant without `-actual` is a pre-flight estimate, not consumption, and a cache hit correctly reports 0.
+  - `localfalcon` (`api.localfalcon.com`), `seogets` (`app.seogets.com`) and `rapidurlindexer` (`rapidurlindexer.com`) expose **no per-call amount** on the response. They match anyway and emit a billable-event-with-unknown-amount, which is far more useful than silence and is distinct from a zero. **No flat per-call constant was invented for any of them** — that is what `zyte` and `brightdata` already do, it looks authoritative, it cannot be corrected without a deploy, and it is tracked as a defect in BLU-1734.
+- **`VeTrackUsage.costUsd` widens from `number` to `number | null`**, and `VeTrackUsage.creditsCharged` is added. A provider that bills in credits genuinely does not know its dollar cost at the point of the call: the rate depends on the account's plan, which is server knowledge. Widening an input type is backward compatible for callers passing a number.
+- **`credits_charged` now rides the hook path**, not just `trackCredits`. The column, the ingest mapping and the credits-to-dollars conversion all already existed (`0030_provider_credit_prices.sql`); only the hook never populated the field.
+- **First tests in this package.** `bun test` plus a suite covering the 401 path and the Ahrefs header extraction. Removing the status check fails the suite.
+- **No migration and no service change.**
+
 ## v0.11.0 — 2026-08-04
 
 ### Cloro pricing removed from the SDK; `correlationId` on manual events
