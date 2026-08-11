@@ -88,6 +88,7 @@ export function installFetchHook() {
                 reasoning_tokens: usage?.reasoningTokens ?? null,
                 latency_ms: latencyMs,
                 cost_usd: usage?.costUsd ?? null,
+                cost_source: usage?.costSource,
                 status_code: response.status,
                 credits_charged: usage?.creditsCharged ?? null,
             };
@@ -157,6 +158,7 @@ export function trackUsage(usage) {
         reasoning_tokens: usage.reasoningTokens ?? null,
         latency_ms: usage.latencyMs ?? null,
         cost_usd: usage.costUsd ?? null,
+        cost_source: usage.costUsd != null ? usage.costSource : undefined,
         status_code: usage.statusCode ?? null,
         credits_charged: usage.creditsCharged ?? null,
         credit_price_usd_at_event: usage.creditPriceUsd ?? null,
@@ -189,6 +191,7 @@ export function trackCredits(input) {
         reasoning_tokens: null,
         latency_ms: null,
         cost_usd: null,
+        cost_source: undefined,
         status_code: null,
         credits_charged: input.credits,
         credit_price_usd_at_event: input.creditPriceUsd ?? null,

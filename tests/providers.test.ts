@@ -8,6 +8,38 @@ const provider = (name: string) => {
 };
 
 describe("provider matchers", () => {
+  it("distinguishes OpenRouter vendor dollars from its SDK table fallback", async () => {
+    const openrouter = provider("openrouter");
+    const vendorResponse = new Response(
+      JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        usage: { prompt_tokens: 1_000, completion_tokens: 500, cost: 0.0042 },
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+    const fallbackResponse = new Response(
+      JSON.stringify({
+        model: "gpt-4o-mini",
+        usage: { prompt_tokens: 1_000, completion_tokens: 500 },
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+
+    expect(await openrouter.extract(vendorResponse)).toEqual(
+      expect.objectContaining({ costUsd: 0.0042, costSource: "vendor_stated" }),
+    );
+    expect(await openrouter.extract(fallbackResponse)).toEqual(
+      expect.objectContaining({ costUsd: 0.00045, costSource: "sdk_table" }),
+    );
+  });
+
+  it("tags a hardcoded flat provider amount as SDK flat", async () => {
+    expect(await provider("brightdata").extract(new Response(null))).toEqual({
+      costUsd: 0.0015,
+      costSource: "sdk_flat",
+    });
+  });
+
   it("extracts Ahrefs consumed units from the actual-cost response header", async () => {
     const ahrefs = provider("ahrefs");
     const response = new Response(null, {
