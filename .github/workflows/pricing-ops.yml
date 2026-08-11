@@ -1,0 +1,115 @@
+name: Pricing ops
+
+# Read and maintain the pricing tables in production D1 from CI, using the
+# repo's own CLOUDFLARE_API_TOKEN.
+#
+# Why this exists: `wrangler` on a laptop authenticates with a single global
+# OAuth token, so anyone who runs `wrangler login` for a different Cloudflare
+# account silently takes away every other account's access on that machine.
+# That happened mid-incident on 2026-08-11 and blocked verification of the
+# catalog-sync fix. CI already holds a scoped token for this account, so the
+# checks that matter do not depend on whichever account a laptop last logged in
+# to.
+#
+# Modes:
+#   report     SELECT only. Catalog contents, cost_source distribution, and the
+#              configured credit rates. Safe to run any time.
+#   force-sync Sets model_pricing.updated_at = 0 so the next hourly cron must
+#              re-sync instead of waiting out the 20h staleness window. Touches
+#              one column on a lookup table; no spend data, no prices, and the
+#              sync overwrites it on success.
+#   set-rates  Upserts the Local Falcon and Rapid URL Indexer credit rates.
+#              Without them their credits aggregate as $0, which reads as free
+#              rather than as unpriced.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "report | force-sync | set-rates"
+        required: true
+        default: report
+        type: choice
+        options: [report, force-sync, set-rates]
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 26108e3201e299582e4f6df2912f0b19
+  DB: ve-track-prod-db
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install root SDK deps
+        working-directory: .
+        run: bun install
+      - run: bun install
+
+      - name: Force the catalog stale
+        if: inputs.mode == 'force-sync'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "UPDATE model_pricing SET updated_at = 0"
+
+      - name: Set the credit rates
+        if: inputs.mode == 'set-rates'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          # Same mechanism and same tenant as the Ahrefs rate set in PR #46.
+          # Both figures are derived from published pricing and are marked as
+          # such in `note`, so a stale rate is auditable rather than mysterious.
+          # They should be replaced with invoice-derived numbers when one is to
+          # hand: a rate a human typed goes stale silently when a plan changes.
+          bunx wrangler d1 execute "$DB" --remote --command "
+            INSERT INTO provider_credit_prices (id, tenant_id, provider, credit_price_usd, note)
+            SELECT 'pcp_localfalcon_' || tenant_id, tenant_id, 'localfalcon', 0.003,
+                   'Local Falcon scan credit = one grid pin. From published plan pricing, NOT an invoice. Verify against a real invoice.'
+              FROM provider_credit_prices WHERE provider = 'ahrefs'
+            ON CONFLICT (tenant_id, provider) DO UPDATE SET
+              credit_price_usd = excluded.credit_price_usd,
+              note = excluded.note,
+              updated_at = current_timestamp;
+          "
+          bunx wrangler d1 execute "$DB" --remote --command "
+            INSERT INTO provider_credit_prices (id, tenant_id, provider, credit_price_usd, note)
+            SELECT 'pcp_rapidurlindexer_' || tenant_id, tenant_id, 'rapidurlindexer', 0.045,
+                   'Rapid URL Indexer credit = one URL submitted. From published plan pricing, NOT an invoice. Verify against a real invoice.'
+              FROM provider_credit_prices WHERE provider = 'ahrefs'
+            ON CONFLICT (tenant_id, provider) DO UPDATE SET
+              credit_price_usd = excluded.credit_price_usd,
+              note = excluded.note,
+              updated_at = current_timestamp;
+          "
+
+      - name: Report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          echo "::group::model_pricing by provider"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT provider, COUNT(*) AS rows, MAX(updated_at) AS latest FROM model_pricing GROUP BY provider ORDER BY provider"
+          echo "::endgroup::"
+
+          echo "::group::cost_source distribution, last 24h"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT provider, cost_source, cost_confidence, COUNT(*) AS c, ROUND(SUM(cost_usd), 4) AS usd FROM usage_events WHERE timestamp > (strftime('%s','now') - 86400) * 1000 GROUP BY 1,2,3 ORDER BY c DESC LIMIT 30"
+          echo "::endgroup::"
+
+          echo "::group::most recent 15 events"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT provider, action, model, cost_usd, credits_charged, cost_source, cost_confidence, status_code, timestamp FROM usage_events ORDER BY timestamp DESC LIMIT 15"
+          echo "::endgroup::"
+
+          echo "::group::configured credit rates"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT provider, credit_price_usd, note, updated_at FROM provider_credit_prices ORDER BY provider"
+          echo "::endgroup::"
