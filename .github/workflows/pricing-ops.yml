@@ -135,9 +135,15 @@ jobs:
             --command "SELECT provider, action, model, cost_usd, credits_charged, cost_source, cost_confidence, status_code, timestamp FROM usage_events ORDER BY timestamp DESC LIMIT 15"
           echo "::endgroup::"
 
-          echo "::group::do repriced-provider model ids actually match the catalog"
+          # Mirrors resolveEntry: exact id first, then the normalized form with a
+          # trailing -YYYY-MM-DD or -NNNNNNNN stripped. An exact-only check
+          # reports NO MATCH for ids like `gpt-5-2025-08-07` that the pricer
+          # resolves perfectly well, and a diagnostic that cries wolf is worse
+          # than none. It still does not model resolveEntry's prefix fallback,
+          # so NO MATCH here means "needs a look", not "definitely unpriced".
+          echo "::group::do repriced-provider model ids resolve against the catalog"
           bunx wrangler d1 execute "$DB" --remote \
-            --command "SELECT e.provider, e.model, COUNT(*) AS events, MAX(CASE WHEN p.model_id IS NULL THEN 'NO MATCH' ELSE 'matches' END) AS catalog FROM usage_events e LEFT JOIN model_pricing p ON p.provider = e.provider AND lower(p.model_id) = lower(e.model) WHERE e.provider IN ('openai','anthropic','gemini','openrouter') AND e.model IS NOT NULL AND e.timestamp > (strftime('%s','now') - 172800) * 1000 GROUP BY 1,2 ORDER BY events DESC LIMIT 20"
+            --command "WITH ev AS (SELECT provider, model, COUNT(*) AS events, lower(model) AS raw, replace(replace(lower(model), substr(lower(model), length(lower(model)) - 10, 11), ''), '  ', '') AS unused FROM usage_events WHERE provider IN ('openai','anthropic','gemini','openrouter') AND model IS NOT NULL AND timestamp > (strftime('%s','now') - 172800) * 1000 GROUP BY 1,2) SELECT ev.provider, ev.model, ev.events, CASE WHEN EXISTS (SELECT 1 FROM model_pricing p WHERE p.provider = ev.provider AND (lower(p.model_id) = ev.raw OR ev.raw GLOB lower(p.model_id) || '-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR ev.raw GLOB lower(p.model_id) || '-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')) THEN 'resolves' ELSE 'NO MATCH' END AS catalog FROM ev ORDER BY ev.events DESC LIMIT 20"
           echo "::endgroup::"
 
           echo "::group::configured credit rates"
