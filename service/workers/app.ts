@@ -38,14 +38,22 @@ const handler = {
   },
   async scheduled(event, env, ctx) {
     const db = drizzle(env.DB);
-    ctx.waitUntil(PricingService.syncIfStale(db));
+    const tasks: Promise<unknown>[] = [PricingService.syncIfStale(db)];
     if (event.cron === DAILY_CRON) {
-      ctx.waitUntil(
+      tasks.push(
         env.TRACKER_QUEUE
           ? TrackerService.enqueueAll(db, env)
           : TrackerService.syncAll(db, env),
       );
     }
+    // allSettled, not all: on the daily tick these two are independent, and a
+    // failing pricing sync must not cut the tracker sync short. Await both,
+    // then rethrow the first failure so Sentry captures it and Cron "Past
+    // Events" records the tick as failed — the whole point of not using
+    // ctx.waitUntil here.
+    const results = await Promise.allSettled(tasks);
+    const failed = results.find((r) => r.status === "rejected");
+    if (failed) throw failed.reason;
   },
   async queue(batch, env) {
     await trackerConsumer(batch as MessageBatch<TrackerSyncMessage>, env);

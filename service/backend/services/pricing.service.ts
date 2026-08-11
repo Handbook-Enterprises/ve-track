@@ -132,6 +132,15 @@ class PricingService {
     }
 
     const written = await ModelPricingRepository.upsertMany(db, rows);
+    const latestUpdatedAt = await ModelPricingRepository.latestUpdatedAt(db);
+    console.log(
+      JSON.stringify({
+        event: "pricing_catalog_sync",
+        parsedRows: rows.length,
+        writtenRows: written,
+        latestUpdatedAt,
+      }),
+    );
     cache = null;
     return written;
   }
@@ -142,6 +151,7 @@ class PricingService {
       if (Date.now() - latest > SYNC_MAX_AGE_MS) await this.syncCatalog(db);
     } catch (err) {
       console.error("[ve-track][pricing] syncIfStale failed", err);
+      throw err;
     }
   }
 

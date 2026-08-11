@@ -4,6 +4,10 @@ import ModelPricing from "../models/model-pricing.model";
 
 type PricingRow = typeof ModelPricing.$inferInsert;
 
+// D1 allows at most 100 bound parameters per query: https://developers.cloudflare.com/d1/platform/limits/
+// This is floor(100 / column_count); recompute it whenever a column is added.
+export const UPSERT_CHUNK_SIZE = 14;
+
 class ModelPricingRepository {
   static async upsertMany(
     db: DrizzleD1Database,
@@ -11,7 +15,8 @@ class ModelPricingRepository {
   ): Promise<number> {
     if (rows.length === 0) return 0;
     const chunks: PricingRow[][] = [];
-    for (let i = 0; i < rows.length; i += 100) chunks.push(rows.slice(i, i + 100));
+    for (let i = 0; i < rows.length; i += UPSERT_CHUNK_SIZE)
+      chunks.push(rows.slice(i, i + UPSERT_CHUNK_SIZE));
     for (const chunk of chunks) {
       await db
         .insert(ModelPricing)
