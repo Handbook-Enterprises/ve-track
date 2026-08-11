@@ -135,6 +135,11 @@ jobs:
             --command "SELECT provider, action, model, cost_usd, credits_charged, cost_source, cost_confidence, status_code, timestamp FROM usage_events ORDER BY timestamp DESC LIMIT 15"
           echo "::endgroup::"
 
+          echo "::group::do repriced-provider model ids actually match the catalog"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT e.provider, e.model, COUNT(*) AS events, MAX(CASE WHEN p.model_id IS NULL THEN 'NO MATCH' ELSE 'matches' END) AS catalog FROM usage_events e LEFT JOIN model_pricing p ON p.provider = e.provider AND lower(p.model_id) = lower(e.model) WHERE e.provider IN ('openai','anthropic','gemini','openrouter') AND e.model IS NOT NULL AND e.timestamp > (strftime('%s','now') - 172800) * 1000 GROUP BY 1,2 ORDER BY events DESC LIMIT 20"
+          echo "::endgroup::"
+
           echo "::group::configured credit rates"
           bunx wrangler d1 execute "$DB" --remote \
             --command "SELECT provider, credit_price_usd, note, updated_at FROM provider_credit_prices ORDER BY provider"
