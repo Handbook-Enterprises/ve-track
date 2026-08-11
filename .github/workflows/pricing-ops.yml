@@ -21,6 +21,9 @@ name: Pricing ops
 #   set-rates  Upserts the Local Falcon and Rapid URL Indexer credit rates.
 #              Without them their credits aggregate as $0, which reads as free
 #              rather than as unpriced.
+#   prune-stale Deletes model_pricing rows below the last successful sync's
+#              watermark, i.e. models the catalog has stopped pricing. upsertMany
+#              never deletes, so these survive forever otherwise.
 
 on:
   workflow_dispatch:
@@ -30,7 +33,7 @@ on:
         required: true
         default: report
         type: choice
-        options: [report, force-sync, set-rates]
+        options: [report, force-sync, set-rates, prune-stale]
 
 env:
   CLOUDFLARE_ACCOUNT_ID: 26108e3201e299582e4f6df2912f0b19
@@ -89,6 +92,29 @@ jobs:
               note = excluded.note,
               updated_at = current_timestamp;
           "
+
+      - name: Prune rows the catalog no longer prices
+        if: inputs.mode == 'prune-stale'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          # `upsertMany` inserts and updates but never deletes, so a model that
+          # the catalog has STOPPED pricing keeps whatever row it had. That
+          # matters because `model_pricing` was hand-populated on 2026-08-10
+          # while the sync was broken, and that population predates the fix that
+          # skips models with no token pricing. Those rows are still sitting
+          # there at 0.0, which is exactly the "free at high confidence" defect
+          # the skip was added to prevent.
+          #
+          # A successful sync stamps every row it produced with the same fresh
+          # `updated_at`. Anything left below that watermark is a row the
+          # catalog no longer produces. Deleting by watermark rather than by
+          # price is deliberate: a genuinely free model has a legitimate 0.0 and
+          # must survive.
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "SELECT provider, COUNT(*) AS stale FROM model_pricing WHERE updated_at < (SELECT MAX(updated_at) FROM model_pricing) GROUP BY provider"
+          bunx wrangler d1 execute "$DB" --remote \
+            --command "DELETE FROM model_pricing WHERE updated_at < (SELECT MAX(updated_at) FROM model_pricing)"
 
       - name: Report
         env:
