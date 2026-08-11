@@ -48,6 +48,24 @@ export const computeMargin = (revenue: number, cost: number) => {
   return { margin_usd, margin_pct };
 };
 
+// Providers whose SDK extractor can return a dollar figure the vendor itself
+// stated, rather than one the SDK computed. Derived by reading every extractor
+// in `src/providers.ts`: these five have a branch that returns the vendor's own
+// number (OpenRouter and Perplexity `usage.cost`, Zyte's `Zyte-Request-Cost`
+// header, DataForSEO's `cost`, Apify's `usageTotalUsd`).
+//
+// Used only to decide whether an event carrying NO provenance is safe to
+// reprice. openai, anthropic and gemini are deliberately absent: their
+// extractors have no such branch, so an unlabelled figure from them is always
+// the SDK's own table and always safe to replace.
+const PROVIDERS_THAT_CAN_STATE_A_PRICE = new Set([
+  "openrouter",
+  "perplexity",
+  "zyte",
+  "dataforseo",
+  "apify",
+]);
+
 const DEFAULT_FROM_DAYS = 7;
 const DAY_MS = 86_400_000;
 
@@ -160,10 +178,40 @@ class UsageEventService {
       const cachedInput = e.cached_input_tokens ?? 0;
       const cacheWrite = e.cache_write_tokens ?? 0;
       let cost_usd = e.cost_usd ?? null;
-      let cost_source = "provider_response";
-      let cost_confidence = cost_usd != null ? "high" : "unknown";
+      const sdkCostSource =
+        e.cost_source === "vendor_stated" ||
+        e.cost_source === "sdk_table" ||
+        e.cost_source === "sdk_flat"
+          ? e.cost_source
+          : undefined;
+      let cost_source = sdkCostSource ?? "provider_response";
+      let cost_confidence =
+        cost_usd == null
+          ? "unknown"
+          : sdkCostSource === "sdk_flat"
+            ? "low"
+            : sdkCostSource === "sdk_table"
+              ? "medium"
+              : "high";
 
-      if (REPRICE_PROVIDERS.has(e.provider)) {
+      // Never overwrite a dollar figure the vendor itself stated. Repricing
+      // exists to replace the SDK's frozen price table, not the vendor's own
+      // receipt: OpenRouter's `usage.cost` IS the amount charged, and a
+      // catalog computation from token counts is only an approximation of it.
+      //
+      // An event with no provenance came from an SDK too old to say which it
+      // sent, so we fall back to the provider. openai, anthropic and gemini
+      // are safe to reprice unlabelled, because their extractors can ONLY
+      // compute from the SDK's own table and never carry a vendor figure.
+      // The providers below can, so an unlabelled figure from them might be a
+      // real receipt and is left alone until the app ships a newer SDK.
+      const mayCarryVendorPrice =
+        cost_usd != null &&
+        (sdkCostSource === "vendor_stated" ||
+          (sdkCostSource === undefined &&
+            PROVIDERS_THAT_CAN_STATE_A_PRICE.has(e.provider)));
+
+      if (REPRICE_PROVIDERS.has(e.provider) && !mayCarryVendorPrice) {
         const priced = PricingService.price(index, e.provider, e.model ?? null, {
           prompt: e.prompt_tokens ?? 0,
           cached: cachedInput,

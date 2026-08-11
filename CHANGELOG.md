@@ -4,6 +4,19 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.13.0 - 2026-08-10
+
+### SDK cost provenance separates vendor dollars from bundled estimates
+
+Every non-null dollar amount sent by the SDK previously arrived as `cost_source = "provider_response"` with high confidence. That label hid three materially different producers: a dollar figure returned by the vendor, a token estimate from the SDK's deploy-time `MODEL_PRICING` table, and a hardcoded per-call guess. The rows could not be separated after ingest, so removing or auditing the stale client price table was unsafe.
+
+- **Extractors now state how each dollar value was produced.** `vendor_stated` means the response supplied the amount, `sdk_table` means the bundled model table computed it, and `sdk_flat` means SDK code supplied a constant. Mixed providers decide per response, including OpenRouter and Perplexity table fallbacks and Zyte's flat fallback.
+- **The provenance travels on both automatic and manual event paths.** `trackUsage` accepts an optional `costSource`. It does not invent a default because a caller-supplied number may be a vendor invoice value, an application-side calculation, or a local estimate. Omitting it preserves the existing `provider_response` behavior. `trackCredits` carries no dollar provenance because it carries no dollar cost.
+- **Ingest reuses the existing `cost_source` column.** New SDK events retain their stated provenance. Older SDKs with no field still receive `provider_response`, and server-side credit-rate conversion still overrides client provenance.
+- **Server-side repricing no longer overwrites a vendor-stated figure.** This is the behavioural point of the release. `REPRICE_PROVIDERS` previously replaced `cost_usd` unconditionally, so once the models.dev catalogue was populated an OpenRouter call whose response carried `usage.cost` would have had that real charge overwritten by a token-count approximation. Repricing exists to replace the SDK's frozen price table, not the vendor's own receipt. Events with no provenance came from an SDK too old to say which they carry, so the fallback is per provider: openai, anthropic and gemini are still repriced, because their extractors have no vendor-stated branch and can only ever have computed the figure locally; openrouter, perplexity, zyte, dataforseo and apify are left alone, because theirs do. Those five start being repriced automatically once their apps ship this version.
+- **Confidence now follows the evidence.** Vendor-stated dollars remain `high`, frozen SDK table estimates are `medium`, and hardcoded SDK constants are `low`. Catalog values remain `high`, credit-rate values remain `medium`, and legacy events retain their prior confidence behavior.
+- **No migration and no historical rewrite.** Existing ambiguous rows remain unchanged. Some provider-specific flat constants can be inferred safely for a separate backfill, but mixed response and fallback branches cannot be reconstructed from the stored event.
+
 ## v0.12.0 — 2026-08-10
 
 ### A rejected ingest is no longer reported as a success; four new provider matchers

@@ -186,6 +186,7 @@ export const PROVIDERS: Provider[] = [
       const costUsd = explicit ?? computeCost(model, prompt + cached, completionTokens);
       return {
         costUsd,
+        costSource: explicit !== null ? "vendor_stated" : "sdk_table",
         model: model ?? undefined,
         promptTokens: prompt,
         completionTokens,
@@ -219,6 +220,7 @@ export const PROVIDERS: Provider[] = [
       const costUsd = computeCost(model, prompt + cached, completionTokens);
       return {
         costUsd,
+        costSource: "sdk_table",
         model: model ?? undefined,
         promptTokens: prompt,
         completionTokens,
@@ -258,6 +260,7 @@ export const PROVIDERS: Provider[] = [
       );
       return {
         costUsd,
+        costSource: "sdk_table",
         model: model ?? undefined,
         promptTokens,
         completionTokens,
@@ -289,6 +292,7 @@ export const PROVIDERS: Provider[] = [
       const costUsd = computeCost(model, totalPrompt, completionTokens);
       return {
         costUsd,
+        costSource: "sdk_table",
         model: model ?? undefined,
         promptTokens: Math.max(0, totalPrompt - cached),
         completionTokens,
@@ -316,6 +320,7 @@ export const PROVIDERS: Provider[] = [
           : computeCost(model, prompt + cached, completionTokens);
       return {
         costUsd,
+        costSource: typeof explicit === "number" ? "vendor_stated" : "sdk_table",
         model: model ?? undefined,
         promptTokens: prompt,
         completionTokens,
@@ -338,6 +343,7 @@ export const PROVIDERS: Provider[] = [
       }
       return {
         costUsd: Math.round(images * FAL_IMAGE_USD * 1_000_000) / 1_000_000,
+        costSource: "sdk_flat",
         model: model ?? undefined,
       };
     },
@@ -347,10 +353,12 @@ export const PROVIDERS: Provider[] = [
     match: (u) => u.includes("api.zyte.com"),
     extract: async (resp) => {
       const headerCost = parseFloat(resp.headers.get("Zyte-Request-Cost") ?? "0");
-      if (headerCost > 0) return { costUsd: headerCost };
+      if (headerCost > 0) return { costUsd: headerCost, costSource: "vendor_stated" };
       const j: any = await resp.json().catch(() => null);
       const bodyCost = j?.requestCost ?? j?.cost ?? 0;
-      return bodyCost > 0 ? { costUsd: bodyCost } : { costUsd: 0.001 };
+      return bodyCost > 0
+        ? { costUsd: bodyCost, costSource: "vendor_stated" }
+        : { costUsd: 0.001, costSource: "sdk_flat" };
     },
   },
   {
@@ -358,8 +366,10 @@ export const PROVIDERS: Provider[] = [
     match: (u) => u.includes("api.dataforseo.com"),
     extract: async (resp) => {
       const j: any = await resp.json().catch(() => null);
-      const cost = j?.cost ?? j?.tasks?.[0]?.cost ?? 0;
-      return { costUsd: cost };
+      const cost = j?.cost ?? j?.tasks?.[0]?.cost;
+      return cost != null
+        ? { costUsd: cost, costSource: "vendor_stated" }
+        : { costUsd: 0, costSource: "sdk_flat" };
     },
   },
   {
@@ -368,8 +378,13 @@ export const PROVIDERS: Provider[] = [
     extract: async (resp) => {
       const j: any = await resp.json().catch(() => null);
       const data = j?.data ?? j;
-      const cost = data?.usageTotalUsd ?? data?.stats?.computeUnits ?? 0;
-      return { costUsd: typeof cost === "number" ? cost : 0 };
+      const cost = data?.usageTotalUsd ?? data?.stats?.computeUnits;
+      return cost != null
+        ? {
+            costUsd: typeof cost === "number" ? cost : 0,
+            costSource: "vendor_stated",
+          }
+        : { costUsd: 0, costSource: "sdk_flat" };
     },
   },
   {
@@ -378,7 +393,7 @@ export const PROVIDERS: Provider[] = [
     extract: async (resp) => {
       const j: any = await resp.json().catch(() => null);
       const credits = j?.creditsUsed ?? j?.data?.creditsUsed ?? 0;
-      return { costUsd: 0, promptTokens: credits };
+      return { costUsd: 0, costSource: "sdk_flat", promptTokens: credits };
     },
   },
   {
@@ -413,6 +428,6 @@ export const PROVIDERS: Provider[] = [
   {
     name: "brightdata",
     match: (u) => u.includes("brightdata.com") || u.includes("luminati.io"),
-    extract: async () => ({ costUsd: 0.0015 }),
+    extract: async () => ({ costUsd: 0.0015, costSource: "sdk_flat" }),
   },
 ];

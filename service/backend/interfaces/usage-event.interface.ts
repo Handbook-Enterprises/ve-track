@@ -1,3 +1,8 @@
+export type CostSourceProvenance =
+  | "vendor_stated"
+  | "sdk_table"
+  | "sdk_flat";
+
 export interface UsageEventInput {
   id: string;
   timestamp: number;
@@ -13,6 +18,7 @@ export interface UsageEventInput {
   reasoning_tokens?: number | null;
   latency_ms: number | null;
   cost_usd: number | null;
+  cost_source?: CostSourceProvenance;
   status_code: number | null;
   credits_charged: number | null;
   credit_price_usd_at_event: number | null;

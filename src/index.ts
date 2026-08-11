@@ -15,6 +15,7 @@ export {
 export type { TrackUsageInput, TrackCreditsInput } from "./hook.js";
 export { PROVIDERS } from "./providers.js";
 export type {
+  CostSourceProvenance,
   TrackedHandlerConfig,
   UserResolver,
   VeTrackUser,
