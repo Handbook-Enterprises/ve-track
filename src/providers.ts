@@ -382,6 +382,35 @@ export const PROVIDERS: Provider[] = [
     },
   },
   {
+    name: "ahrefs",
+    match: (u) => u.includes("api.ahrefs.com"),
+    extract: async (resp) => {
+      const rawUnits = resp.headers.get("x-api-units-cost-total-actual");
+      if (rawUnits === null || rawUnits.trim() === "") return null;
+      const units = Number(rawUnits);
+      return Number.isFinite(units) && units >= 0
+        ? { costUsd: null, creditsCharged: units }
+        : null;
+    },
+  },
+  // These providers are billable, but their responses expose no per-call amount.
+  // Matching still emits an event with null cost/credits instead of staying silent.
+  {
+    name: "localfalcon",
+    match: (u) => u.includes("api.localfalcon.com"),
+    extract: async () => null,
+  },
+  {
+    name: "seogets",
+    match: (u) => u.includes("app.seogets.com"),
+    extract: async () => null,
+  },
+  {
+    name: "rapidurlindexer",
+    match: (u) => u.includes("rapidurlindexer.com"),
+    extract: async () => null,
+  },
+  {
     name: "brightdata",
     match: (u) => u.includes("brightdata.com") || u.includes("luminati.io"),
     extract: async () => ({ costUsd: 0.0015 }),

@@ -27,7 +27,12 @@ export async function flushEvents(scope: RequestScope): Promise<void> {
       },
       body: JSON.stringify({ app: scope.app, events }),
     });
-    await res.text().catch(() => "<unreadable>");
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "<unreadable>");
+      console.error(
+        `[ve-track] ingest rejected: HTTP ${res.status}, ${events.length} event(s) lost: ${detail.slice(0, 200)}`,
+      );
+    }
   } catch (err) {
     console.error("[ve-track][ingest] flush failed:", err);
   }
