@@ -1,6 +1,6 @@
 {
   "name": "@viewengine/track",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Cost attribution SDK for ViewEngine. Auto-tracks every provider fetch from any Worker/Node app and ships it to ve-track over HTTP.",
   "license": "MIT",
   "type": "module",
@@ -26,6 +26,7 @@
   "homepage": "https://track.viewengine.ai",
   "private": false,
   "scripts": {
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "prepack": "bun run build"
