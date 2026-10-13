@@ -19,7 +19,7 @@ export const parseSseData = (text) => {
 export const isEventStream = (resp) => resp.headers.get("content-type")?.includes("event-stream") ?? false;
 export const readStreamUsageChunk = (chunks) => {
     for (let i = chunks.length - 1; i >= 0; i--) {
-        if (chunks[i]?.usage)
+        if (chunks[i]?.usage || chunks[i]?.response?.usage)
             return chunks[i];
     }
     return null;

@@ -83,3 +83,53 @@ describe("provider matchers", () => {
     expect(await matchedProvider.extract(new Response(null))).toBeNull();
   });
 });
+
+describe("OpenAI Responses API streaming", () => {
+  const user = { userId: null, orgId: null };
+
+  it("only requests stream usage on Chat Completions bodies", () => {
+    const openai = provider("openai");
+    const chat: RequestInit = { body: JSON.stringify({ model: "gpt-5", stream: true, messages: [] }) };
+    const responses: RequestInit = { body: JSON.stringify({ model: "gpt-5", stream: true, input: "hi" }) };
+
+    openai.enhance?.(chat, "app", user);
+    openai.enhance?.(responses, "app", user);
+
+    expect(JSON.parse(chat.body as string).stream_options).toEqual({ include_usage: true });
+    expect(JSON.parse(responses.body as string).stream_options).toBeUndefined();
+  });
+
+  it("reads usage from the response.completed event", async () => {
+    const sse = [
+      { type: "response.created", response: { model: "gpt-5", usage: null } },
+      {
+        type: "response.completed",
+        response: {
+          model: "gpt-5",
+          usage: {
+            input_tokens: 1_000,
+            input_tokens_details: { cached_tokens: 200 },
+            output_tokens: 500,
+            output_tokens_details: { reasoning_tokens: 100 },
+          },
+        },
+      },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const usage = await provider("openai").extract(
+      new Response(sse, { headers: { "content-type": "text/event-stream" } }),
+    );
+
+    expect(usage).toEqual(
+      expect.objectContaining({
+        model: "gpt-5",
+        promptTokens: 800,
+        cachedInputTokens: 200,
+        completionTokens: 500,
+        reasoningTokens: 100,
+        costSource: "sdk_table",
+      }),
+    );
+  });
+});

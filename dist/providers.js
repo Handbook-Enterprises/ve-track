@@ -59,7 +59,7 @@ const enableStreamUsage = (init) => {
         return;
     try {
         const body = JSON.parse(init.body);
-        if (body?.stream !== true)
+        if (body?.stream !== true || !Array.isArray(body.messages))
             return;
         body.stream_options = { ...(body.stream_options ?? {}), include_usage: true };
         init.body = JSON.stringify(body);
@@ -74,6 +74,8 @@ const readOpenAiUsage = async (resp) => {
         const hit = readStreamUsageChunk(chunks);
         if (!hit)
             return null;
+        if (!hit.usage && hit.response?.usage)
+            return { usage: hit.response.usage, model: hit.response.model ?? null };
         return { usage: hit.usage, model: hit.model ?? chunks[0]?.model ?? null };
     }
     const j = await resp.json().catch(() => null);
@@ -82,7 +84,7 @@ const readOpenAiUsage = async (resp) => {
     return { usage: j.usage, model: j.model ?? null };
 };
 const splitCachedInput = (usage) => {
-    const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
+    const cached = usage.prompt_tokens_details?.cached_tokens ?? usage.input_tokens_details?.cached_tokens ?? 0;
     const total = usage.prompt_tokens ?? usage.input_tokens ?? 0;
     return { prompt: Math.max(0, total - cached), cached };
 };
@@ -206,7 +208,7 @@ export const PROVIDERS = [
             const { usage, model } = payload;
             const { prompt, cached } = splitCachedInput(usage);
             const completionTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
-            const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? 0;
+            const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? usage.output_tokens_details?.reasoning_tokens ?? 0;
             const costUsd = computeCost(model, prompt + cached, completionTokens);
             return {
                 costUsd,
