@@ -4,6 +4,16 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.13.2 - 2026-10-13
+
+### Meta Muse calls are tracked
+
+Calls to `api.meta.ai` matched no provider, so they were never recorded and Muse spend was invisible.
+
+- **New `meta` provider.** Matches `api.meta.ai` and reads usage with the same OpenAI compatible extractor as `openai` (Responses and Chat Completions, streamed or not). It adds no `stream_options`.
+- **Muse price row.** `muse-spark*` is priced at $0.10 input and $0.20 output per million tokens (`sdk_table`). `meta` is not in `REPRICE_PROVIDERS`, so the SDK figure is kept.
+- **Streams the caller aborts early are still not priced.** No usage event arrives before the abort, so those rows keep a null cost.
+
 ## v0.13.1 - 2026-10-13
 
 ### Streamed OpenAI Responses API calls no longer fail
