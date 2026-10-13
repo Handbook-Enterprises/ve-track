@@ -133,3 +133,30 @@ describe("OpenAI Responses API streaming", () => {
     );
   });
 });
+
+describe("Meta Muse", () => {
+  it("prices Muse responses from api.meta.ai", async () => {
+    const meta = provider("meta");
+    expect(meta.match("https://api.meta.ai/v1/responses")).toBe(true);
+
+    const usage = await meta.extract(
+      new Response(
+        JSON.stringify({
+          model: "muse-spark-1.3-contributor",
+          usage: { input_tokens: 1_000_000, output_tokens: 500_000 },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    expect(usage).toEqual(
+      expect.objectContaining({
+        model: "muse-spark-1.3-contributor",
+        promptTokens: 1_000_000,
+        completionTokens: 500_000,
+        costUsd: 0.2,
+        costSource: "sdk_table",
+      }),
+    );
+  });
+});

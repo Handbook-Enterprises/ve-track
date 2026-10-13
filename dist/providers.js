@@ -12,6 +12,7 @@ const MODEL_PRICING = [
     { match: /^gpt-3\.5/i, price: { inputPerM: 0.5, outputPerM: 1.5 } },
     { match: /^o3-mini/i, price: { inputPerM: 1.1, outputPerM: 4.4 } },
     { match: /^o3\b/i, price: { inputPerM: 2, outputPerM: 8 } },
+    { match: /^muse-spark/i, price: { inputPerM: 0.1, outputPerM: 0.2 } },
     { match: /^claude-opus-4-7/i, price: { inputPerM: 15, outputPerM: 75 } },
     { match: /^claude-opus-4/i, price: { inputPerM: 15, outputPerM: 75 } },
     { match: /^claude-sonnet-4-6/i, price: { inputPerM: 3, outputPerM: 15 } },
@@ -82,6 +83,25 @@ const readOpenAiUsage = async (resp) => {
     if (!j?.usage)
         return null;
     return { usage: j.usage, model: j.model ?? null };
+};
+const extractOpenAiTableCost = async (resp) => {
+    const payload = await readOpenAiUsage(resp);
+    if (!payload)
+        return null;
+    const { usage, model } = payload;
+    const { prompt, cached } = splitCachedInput(usage);
+    const completionTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
+    const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? usage.output_tokens_details?.reasoning_tokens ?? 0;
+    const costUsd = computeCost(model, prompt + cached, completionTokens);
+    return {
+        costUsd,
+        costSource: "sdk_table",
+        model: model ?? undefined,
+        promptTokens: prompt,
+        completionTokens,
+        cachedInputTokens: cached,
+        reasoningTokens: reasoning,
+    };
 };
 const splitCachedInput = (usage) => {
     const cached = usage.prompt_tokens_details?.cached_tokens ?? usage.input_tokens_details?.cached_tokens ?? 0;
@@ -201,25 +221,12 @@ export const PROVIDERS = [
             }
             enableStreamUsage(init);
         },
-        extract: async (resp) => {
-            const payload = await readOpenAiUsage(resp);
-            if (!payload)
-                return null;
-            const { usage, model } = payload;
-            const { prompt, cached } = splitCachedInput(usage);
-            const completionTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
-            const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? usage.output_tokens_details?.reasoning_tokens ?? 0;
-            const costUsd = computeCost(model, prompt + cached, completionTokens);
-            return {
-                costUsd,
-                costSource: "sdk_table",
-                model: model ?? undefined,
-                promptTokens: prompt,
-                completionTokens,
-                cachedInputTokens: cached,
-                reasoningTokens: reasoning,
-            };
-        },
+        extract: (resp) => extractOpenAiTableCost(resp),
+    },
+    {
+        name: "meta",
+        match: (u) => u.includes("api.meta.ai"),
+        extract: (resp) => extractOpenAiTableCost(resp),
     },
     {
         name: "anthropic",
