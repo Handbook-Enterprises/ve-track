@@ -19,7 +19,7 @@ export const isEventStream = (resp: Response): boolean =>
 
 export const readStreamUsageChunk = (chunks: any[]): any | null => {
   for (let i = chunks.length - 1; i >= 0; i--) {
-    if (chunks[i]?.usage) return chunks[i];
+    if (chunks[i]?.usage || chunks[i]?.response?.usage) return chunks[i];
   }
   return null;
 };

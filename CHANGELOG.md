@@ -4,6 +4,17 @@ Version history for `@viewengine/track`, plus the pricing, architecture, dashboa
 
 ---
 
+## v0.13.1 - 2026-10-13
+
+### Streamed OpenAI Responses API calls no longer fail
+
+The SDK added `stream_options.include_usage` to every streamed OpenAI compatible request. The Responses API (`/v1/responses`) rejects that field with `400 Unknown parameter: 'stream_options.include_usage'`, so any app streaming through it failed whenever ve-track was installed.
+
+- **Stream usage is only requested on Chat Completions bodies.** The field is added only when the request body has a `messages` array. Responses API bodies (`input`) are sent unchanged.
+- **Responses API stream usage is captured.** Usage and model are read from the `response.completed` event.
+- **Responses API token details are read.** Cached input comes from `input_tokens_details.cached_tokens` and reasoning from `output_tokens_details.reasoning_tokens`, alongside the Chat Completions fields.
+- **No migration.** Apps pick it up on their next `bun update @viewengine/track`.
+
 ## v0.13.0 - 2026-08-10
 
 ### SDK cost provenance separates vendor dollars from bundled estimates
